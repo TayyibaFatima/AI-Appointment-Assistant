@@ -33,11 +33,13 @@ input {
 .topbar h1 {
   margin: 0;
   font-size: 22px;
+  color: #111827;
+  font-weight: 700;
 }
 
 .topbar p {
   margin: 5px 0 0;
-  color: #6b7280;
+  color: #4b5563;
   font-size: 13px;
 }
 
@@ -47,6 +49,7 @@ input {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
+  color: #111827;
 }
 
 .status-dot {
@@ -89,12 +92,14 @@ input {
 .appointment-header h2 {
   margin: 0;
   font-size: 18px;
+  color: #111827;
+  font-weight: 700;
 }
 
 .chat-header p,
 .appointment-header p {
   margin: 5px 0 0;
-  color: #6b7280;
+  color: #4b5563;
   font-size: 13px;
 }
 
@@ -139,7 +144,7 @@ input {
 }
 
 .typing {
-  color: #6b7280;
+  color: #4b5563;
 }
 
 .input-area {
@@ -155,6 +160,12 @@ input {
   border-radius: 10px;
   padding: 12px 14px;
   outline: none;
+  color: #111827;
+  background: white;
+}
+
+.input-area input::placeholder {
+  color: #6b7280;
 }
 
 .input-area input:focus {
@@ -209,12 +220,14 @@ input {
 }
 
 .detail span {
-  color: #6b7280;
+  color: #374151;
   font-size: 12px;
+  font-weight: 600;
 }
 
 .detail strong {
   font-size: 14px;
+  color: #111827;
 }
 
 .booking-status {
@@ -228,12 +241,14 @@ input {
 }
 
 .booking-status span {
-  color: #6b7280;
+  color: #374151;
   font-size: 12px;
+  font-weight: 600;
 }
 
 .booking-status strong {
   font-size: 14px;
+  color: #111827;
 }
 
 .reset-button {
@@ -242,8 +257,10 @@ input {
   padding: 11px;
   border: 1px solid #d1d5db;
   background: white;
+  color: #111827;
   border-radius: 9px;
   cursor: pointer;
+  font-weight: 600;
 }
 
 .reset-button:hover {
@@ -262,7 +279,7 @@ input {
 footer {
   text-align: center;
   padding: 20px;
-  color: #6b7280;
+  color: #4b5563;
   font-size: 12px;
 }
 
