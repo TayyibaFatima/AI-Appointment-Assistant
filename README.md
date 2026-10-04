@@ -1,740 +1,447 @@
 # AI Appointment Assistant
 
-An AI-powered clinic appointment assistant that combines **LLM tool calling, structured data, PostgreSQL, session-based state management, and FastAPI** to handle multi-turn appointment booking.
+An AI-powered appointment booking system that uses **LLM tool calling, PostgreSQL, FastAPI, and React** to handle appointment conversations and perform real database-backed bookings.
 
-The project was developed progressively through seven stages, moving from a basic LLM application to a **tool-using AI agent connected to a persistent database and backend API**.
-
----
+The system allows users to interact naturally with an AI assistant to check doctors, find available appointment slots, confirm details, and book appointments.
 
 ## Overview
 
+The AI Appointment Assistant demonstrates how an LLM can be connected to real application logic and a relational database instead of generating responses only.
+
 The assistant can:
 
-* Collect patient information
-* Identify and verify doctors
-* Check appointment availability
-* Maintain appointment information across multiple messages
-* Ask for booking confirmation
-* Book appointments through a database-backed tool
-* Store confirmed appointments in PostgreSQL
-* Maintain separate appointment state for different sessions
-* Expose the AI assistant through a FastAPI REST API
+* Understand natural-language appointment requests
+* Identify doctors and appointment requirements
+* Check doctor information
+* Check real appointment availability
+* Ask for confirmation before booking
+* Book appointments in PostgreSQL
+* Maintain appointment state across messages
+* Provide a React-based user interface
+* Expose the backend through a FastAPI API
 
-The project focuses on understanding how an AI application moves beyond:
-
-```text
-User → LLM → Response
-```
-
-into a system where the LLM can make decisions, request tools, receive tool results, and interact with real application state and databases:
-
-```text
-User
- ↓
-FastAPI
- ↓
-Session State
- ↓
-LLM
- ↓
-Tool Selection
- ↓
-Python Tool Execution
- ↓
-PostgreSQL / Application State
- ↓
-Tool Result
- ↓
-LLM
- ↓
-Final Response
-```
+The current implementation uses **Groq with GPT-OSS-20B** for LLM-based tool calling.
 
 ---
 
-# Key Features
+## Screenshots
 
-### AI-Powered Appointment Booking
+### AI Appointment Assistant — Main Interface
 
-The assistant handles a multi-turn conversation to collect the information required for an appointment.
+![AI Appointment Assistant](screenshots/frontend-main.png)
 
-Example:
+### Appointment Booking Conversation
 
-```text
-User: I want to book an appointment.
+![Appointment Booking Conversation](screenshots/frontend-conversation.png)
 
-Assistant: Sure. What is your name?
+### Successful Appointment Booking
 
-User: Tayyiba.
+![Successful Appointment Booking](screenshots/frontend-booking.png)
 
-Assistant: Which doctor would you like to see?
+### FastAPI Backend — Swagger UI
 
-User: Dr. Sara.
+![FastAPI Swagger UI](screenshots/swagger.png)
 
-Assistant: What date and time would you prefer?
-```
+---
 
-The assistant maintains the information collected throughout the conversation.
+## Key Features
 
-### LLM Tool Calling
+### AI-Powered Appointment Agent
 
-The LLM can decide when an application tool is required.
+The assistant uses an LLM with tool calling to decide when application functions should be executed.
 
-Available tools include:
+The model can use tools for:
 
-```text
-update_appointment
-check_doctor
-check_availability
-book_appointment
-reset_appointment
-```
+* Updating appointment information
+* Checking doctors
+* Checking appointment availability
+* Booking appointments
+* Resetting appointment state
 
-The LLM does not directly execute Python or database operations.
+The LLM does not directly modify the database. Database operations are handled by backend functions.
 
-Instead:
+### PostgreSQL Database
 
-```text
-LLM
- ↓
-Tool Call
- ↓
-Python Tool Executor
- ↓
-Database / Application Logic
- ↓
-Tool Result
- ↓
-LLM
-```
+Appointment information is stored in PostgreSQL rather than being hardcoded.
 
-This separates **LLM decision-making** from **actual application execution**.
+The backend checks:
 
-### PostgreSQL Integration
+* Available doctors
+* Existing appointments
+* Available time slots
+* Appointment conflicts
 
-Appointment data is stored in PostgreSQL rather than a temporary Python list.
-
-The database is used for:
-
-* Doctor lookup
-* Appointment availability
-* Appointment booking
-* Persistent appointment records
-
-Example database operations include:
-
-```sql
-SELECT id
-FROM doctors
-WHERE LOWER(name) = LOWER(%s);
-```
-
-and:
-
-```sql
-SELECT id
-FROM appointments
-WHERE doctor_id = %s
-AND appointment_date = %s
-AND appointment_time = %s
-AND status = 'booked';
-```
-
-Confirmed appointments are persisted using SQL `INSERT` operations.
+A second availability check is performed immediately before booking to reduce the possibility of double booking.
 
 ### Session-Based State
 
-The API uses a `session_id` to maintain appointment state across multiple HTTP requests.
+Each user receives a session ID.
 
-Example:
+The application maintains appointment information associated with that session, including:
 
-```json
-{
-    "session_id": "test-user-1",
-    "message": "My name is Tayyiba"
-}
-```
+* Patient information
+* Doctor
+* Date
+* Time
+* Booking status
 
-This allows different conversations to maintain separate appointment states.
+This allows the conversation to continue across multiple messages.
 
-Conceptually:
+### Confirmation Before Booking
 
-```text
-Session 1
- └── Appointment State
+The assistant does not immediately create an appointment.
 
-Session 2
- └── Appointment State
+It first collects the required information, presents the appointment details to the user, and requires confirmation before performing the booking operation.
 
-Session 3
- └── Appointment State
-```
+### React Frontend
 
-### Reliable Application State
+The project includes a React-based frontend that provides:
 
-A key design principle of the final stage is:
-
-> The application's state is the source of truth, not the LLM's generated response.
-
-The system maintains structured state such as:
-
-```text
-appointment
-availability_checked
-awaiting_confirmation
-booking_completed
-messages
-```
-
-Example:
-
-```json
-{
-    "patient_name": "Tayyiba",
-    "doctor": "Dr. Sara",
-    "date": "2026-09-20",
-    "time": "09:00"
-}
-```
-
-This prevents the application from relying solely on what the model says it remembers.
+* AI chat interface
+* Appointment information panel
+* Booking status
+* Backend connection status
+* Appointment reset functionality
+* Loading and error states
 
 ### FastAPI Backend
 
-The final system is exposed through a REST API.
+The backend exposes REST API endpoints for communication between the frontend and the AI appointment system.
 
-Main endpoints include:
+---
 
-```text
-GET  /
-GET  /health
-POST /chat
-```
-
-Interactive API documentation is available through Swagger UI:
+## Architecture
 
 ```text
-http://127.0.0.1:8000/docs
+                    User
+                      │
+                      ▼
+              React Frontend
+                      │
+                      │ HTTP
+                      ▼
+              FastAPI Backend
+                      │
+          ┌───────────┴───────────┐
+          │                       │
+          ▼                       ▼
+     Groq LLM                PostgreSQL
+   GPT-OSS-20B                Database
+          │
+          ▼
+     Tool Calling
+          │
+    ┌─────┼─────┬─────────────┐
+    │     │     │             │
+    ▼     ▼     ▼             ▼
+ Doctor  Check  Book       Reset
+ Check   Slots  Appointment  State
 ```
 
 ---
 
-# Architecture
-
-The final architecture combines the main components developed throughout the project:
+## AI Agent Workflow
 
 ```text
-                         USER / CLIENT
-                              │
-                              ▼
-                         FASTAPI API
-                              │
-                              ▼
-                       SESSION STATE
-                              │
-                              ▼
-                          GROQ LLM
-                              │
-                     ┌────────┴────────┐
-                     │                 │
-                  Tool Call       Final Response
-                     │
-                     ▼
-                PYTHON TOOLS
-                     │
-          ┌──────────┼───────────┐
-          │          │           │
-          ▼          ▼           ▼
-     Check Doctor  Availability  Booking
-          │          │           │
-          └──────────┼───────────┘
-                     ▼
-                 PostgreSQL
+User Request
+     │
+     ▼
+LLM analyzes the request
+     │
+     ▼
+Determines required tool
+     │
+     ▼
+Backend executes tool
+     │
+     ▼
+PostgreSQL queried/updated
+     │
+     ▼
+Tool result returned to LLM
+     │
+     ▼
+LLM generates response
+     │
+     ▼
+User receives result
+```
+
+For example:
+
+```text
+User:
+"I want to book an appointment with Dr. Sara tomorrow at 9 AM."
+
+        ↓
+
+LLM identifies required information
+
+        ↓
+
+check_doctor()
+
+        ↓
+
+check_availability()
+
+        ↓
+
+Assistant presents appointment details
+
+        ↓
+
+User confirms
+
+        ↓
+
+book_appointment()
+
+        ↓
+
+PostgreSQL stores appointment
+
+        ↓
+
+Booking confirmation
 ```
 
 ---
 
-# Appointment Booking Flow
+## Technology Stack
 
-A typical appointment follows this workflow:
+### AI / LLM
 
-```text
-1. User starts a booking
-          ↓
-2. Assistant collects missing information
-          ↓
-3. Patient information is stored in session state
-          ↓
-4. Doctor is identified and verified
-          ↓
-5. Date and time are collected
-          ↓
-6. Availability is checked
-          ↓
-7. Assistant reports the available/unavailable slot
-          ↓
-8. User confirms the appointment
-          ↓
-9. Booking tool executes
-          ↓
-10. PostgreSQL stores the appointment
-          ↓
-11. Assistant returns the booking confirmation
-```
+* Groq API
+* GPT-OSS-20B
+* LLM Tool Calling
+* Prompt Engineering
+* Agentic AI concepts
 
----
+### Backend
 
-# Technology Stack
+* Python
+* FastAPI
+* Pydantic
+* Uvicorn
+* psycopg2
 
-| Technology        | Purpose                                  |
-| ----------------- | ---------------------------------------- |
-| **Python**        | Main programming language                |
-| **Groq API**      | LLM inference and tool calling           |
-| **GPT-OSS-20B**   | Model used for the tool-calling workflow |
-| **Gemini API**    | Used during early experimentation        |
-| **Pydantic**      | Structured data and request validation   |
-| **PostgreSQL**    | Persistent appointment storage           |
-| **psycopg2**      | PostgreSQL connectivity                  |
-| **FastAPI**       | REST API backend                         |
-| **Uvicorn**       | FastAPI development server               |
-| **python-dotenv** | Environment variable management          |
-
----
-
-# Development Stages
-
-The project was intentionally developed in stages so that each major AI engineering concept could be implemented and tested independently.
-
-## Stage 1 — Gemini API + Basic Tool Calling
-
-The initial version introduced:
-
-* LLM API integration
-* System instructions
-* Conversation history
-* Tool definitions
-* Function calling
-* Python tool execution
-
-The appointment data was initially stored in a simple Python list.
-
-The basic flow was:
-
-```text
-User
- ↓
-Gemini
- ↓
-Tool Request
- ↓
-Python Function
- ↓
-Tool Result
- ↓
-Gemini
- ↓
-Response
-```
-
-The purpose of this stage was to understand the separation between **LLM reasoning/decision-making and application-side tool execution**.
-
----
-
-## Stage 2 — Structured Output
-
-The next stage introduced structured appointment information using Pydantic.
-
-```python
-class Appointment(BaseModel):
-    patient_name: str | None = None
-    doctor: str | None = None
-    date: str | None = None
-    time: str | None = None
-```
-
-This allowed the application to work with predictable fields instead of relying entirely on free-form text.
-
-The workflow became:
-
-```text
-User Message
-      ↓
-Structured Extraction
-      ↓
-Pydantic Appointment
-      ↓
-Update State
-      ↓
-Check Missing Information
-      ↓
-Check Availability
-      ↓
-Confirmation
-      ↓
-Booking
-```
-
----
-
-## Stage 3 — PostgreSQL Integration
-
-The temporary Python appointment list was replaced with PostgreSQL.
-
-The application introduced database-backed:
-
-* Doctor lookup
-* Availability checking
-* Appointment booking
-* Persistent storage
-
-This stage established a clear separation:
-
-```text
-LLM
- ↓
-Information Extraction
- ↓
-Python Application Logic
- ↓
-PostgreSQL
-```
-
----
-
-## Stage 4 — Groq Function / Tool Calling
-
-The project later moved from Gemini to Groq because of free-tier limitations encountered during development.
-
-The model used for the tool-calling workflow is:
-
-```text
-openai/gpt-oss-20b
-```
-
-This stage introduced an LLM-controlled tool loop.
-
-Instead of Python explicitly deciding which operation should happen next, the model could request an appropriate tool.
-
-The agent loop became:
-
-```text
-User Message
-     ↓
-Groq
-     ↓
-Tool Required?
-     ↓
-   Yes
-     ↓
-Python Executes Tool
-     ↓
-Tool Result
-     ↓
-Groq
-     ↓
-Another Tool OR Final Response
-```
-
-Tools introduced during this stage included:
-
-```text
-update_appointment
-check_doctor
-check_availability
-book_appointment
-reset_appointment
-```
-
----
-
-## Stage 5 — FastAPI Backend
-
-The command-line application was converted into a backend service using FastAPI.
-
-Example request:
-
-```json
-{
-    "message": "I want to book an appointment"
-}
-```
-
-The backend sends the message to the AI agent and returns the generated response.
-
-Main endpoints:
-
-```text
-GET  /
-GET  /health
-POST /chat
-```
-
-This transformed the project from a local CLI application into an HTTP-accessible AI backend.
-
----
-
-## Stage 6 — Session-Based Integration
-
-The initial FastAPI implementation used a shared appointment state.
-
-That created a potential multi-user state problem:
-
-```text
-User A
-   ↓
-Shared Appointment State
-   ↑
-User B
-```
-
-Stage 6 introduced `session_id` so each conversation could maintain separate state.
-
-Example:
-
-```json
-{
-    "session_id": "test-user-1",
-    "message": "My name is Tayyiba"
-}
-```
-
-The same session ID is used across requests belonging to the same conversation.
-
-Conceptually:
-
-```text
-Session 1 → Appointment State
-Session 2 → Appointment State
-Session 3 → Appointment State
-```
-
----
-
-## Stage 7 — Reliable Session State + Tool Flow
-
-The final development stage focused on reliability and state consistency.
-
-During testing, an important issue was identified: the LLM could generate a response containing appointment information while the application's actual state remained incomplete.
-
-For example, the model response could mention:
-
-```text
-Dr. Sara
-September 20, 2026
-09:00 AM
-```
-
-while the application state still contained:
-
-```json
-{
-    "patient_name": null,
-    "doctor": null,
-    "date": null,
-    "time": null
-}
-```
-
-This demonstrated an important AI engineering principle:
-
-> Generated text should not be treated as the application's source of truth.
-
-Stage 7 therefore focused on making application-managed state authoritative.
-
-The session tracks information such as:
-
-```text
-appointment
-availability_checked
-awaiting_confirmation
-booking_completed
-messages
-```
-
-The resulting flow is:
-
-```text
-User
- ↓
-FastAPI
- ↓
-Session State
- ↓
-Groq
- ↓
-Tool Selection
- ↓
-Python Tool Execution
- ↓
-Session State Update
- ↓
-Tool Result
- ↓
-Groq
- ↓
-Final Response
-```
-
-Additional reliability improvements include:
-
-* Persistent conversation messages
-* Current appointment state supplied to the model
-* Availability state tracking
-* Confirmation state tracking
-* Booking state tracking
-* Re-checking availability before booking
-* Better protection against stale appointment information
-
----
-
-# AI Engineering Concepts Demonstrated
-
-### LLM API Integration
-
-* API authentication
-* System instructions
-* Conversation history
-* Model responses
-* Environment variables
-
-### Structured Data
-
-* Pydantic models
-* Structured extraction
-* Validation
-* Missing-field handling
-
-### Tool Calling
-
-* Tool schemas
-* Function mapping
-* Tool execution
-* Tool results
-* LLM-controlled tool selection
-
-### Agent Loop
-
-The project implements the basic tool-using agent pattern:
-
-```text
-LLM Decision
-     ↓
-Tool Call
-     ↓
-Tool Execution
-     ↓
-Tool Result
-     ↓
-LLM Decision
-     ↓
-Final Response
-```
-
-### Database Integration
+### Database
 
 * PostgreSQL
 * SQL queries
-* Persistent storage
-* Database-backed availability
-* Database-backed booking
+* Transaction-safe appointment booking
 
-### State Management
+### Frontend
 
-The project progressed from:
+* React
+* Vite
+* JavaScript
+* CSS
 
-```text
-Python List
-     ↓
-Application State
-     ↓
-Session-Based State
-     ↓
-Reliable Session + Tool State
-```
+### Development
 
-### Backend Engineering
-
-* FastAPI
-* REST API
-* Request validation
-* JSON responses
-* Swagger/OpenAPI documentation
-* Session-aware API requests
+* Git
+* GitHub
+* Python Virtual Environment
+* Environment Variables
 
 ---
 
-# Security
+## Development Journey
 
-Sensitive configuration is stored in environment variables.
+The project was developed incrementally to demonstrate the evolution from a simple appointment application into an AI-powered backend system.
 
-Example:
+### Stage 1 — Basic Appointment System
 
-```text
-GROQ_API_KEY=your_api_key
+* Basic appointment logic
+* Initial application structure
+* Doctor and appointment concepts
 
-POSTGRES_HOST=...
-POSTGRES_PORT=...
-POSTGRES_DB=...
-POSTGRES_USER=...
-POSTGRES_PASSWORD=...
-```
+### Stage 2 — Structured Appointment Data
 
-The `.env` file should not be committed to GitHub.
+* Improved appointment handling
+* Structured application state
+* Database-oriented design
 
-A `.gitignore` file is used to exclude sensitive configuration and local project files.
+### Stage 3 — PostgreSQL Integration
+
+* PostgreSQL database integration
+* Persistent appointment storage
+* Database queries for doctors and appointments
+
+### Stage 4 — Groq + LLM Tool Calling
+
+* Groq API integration
+* GPT-OSS-20B
+* LLM tool calling
+* Natural-language appointment requests
+
+### Stage 5 — FastAPI Backend
+
+* FastAPI REST API
+* Chat endpoint
+* Appointment state endpoints
+* Backend health endpoint
+
+### Stage 6 — Improved Agent Logic
+
+* Better tool selection
+* Appointment state management
+* Confirmation workflow
+* Availability validation
+
+### Stage 7 — Full AI Appointment Assistant
+
+* Groq-powered AI agent
+* PostgreSQL-backed booking
+* Reliable application-managed state
+* React frontend
+* FastAPI backend
+* Complete appointment workflow
 
 ---
 
-# Running the Project
+## AI Engineering Concepts Demonstrated
 
-## 1. Clone the repository
+This project focuses on practical AI engineering rather than simply connecting an LLM to a chat interface.
 
-```powershell
-git clone <your-repository-url>
-cd AI_Appointment_Assistant
+### LLM Tool Calling
+
+The LLM can select backend tools based on the user's request.
+
+### Agentic Workflow
+
+The assistant can reason about what information is missing and determine which application function should be executed next.
+
+### Grounded Responses
+
+Doctor and appointment information comes from the application's database rather than being invented by the model.
+
+### Application-Managed State
+
+The backend maintains the authoritative appointment state. Generated LLM text is not treated as the source of truth.
+
+### Database-Backed AI
+
+The AI agent interacts with real PostgreSQL data through controlled backend functions.
+
+### Reliability
+
+The booking workflow checks availability before booking and performs another immediate availability check before the final database insertion.
+
+### API-Based AI Architecture
+
+The AI system is exposed through a FastAPI backend, allowing the frontend to communicate with the agent through HTTP endpoints.
+
+---
+
+## Example Conversation
+
+```text
+User:
+I want to book an appointment.
+
+Assistant:
+Sure. Which doctor would you like to see?
+
+User:
+Dr. Sara.
+
+Assistant:
+What date would you like?
+
+User:
+September 20, 2026.
+
+Assistant:
+9:00 AM is available with Dr. Sara.
+Would you like me to book it?
+
+User:
+Yes, please book it.
+
+Assistant:
+Your appointment has been successfully booked.
 ```
 
-## 2. Create a virtual environment
+The actual available doctors and appointment slots are retrieved from PostgreSQL.
 
-```powershell
+---
+
+## Project Structure
+
+```text
+AI_Appointment_Assistant/
+│
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   ├── package.json
+│   ├── package-lock.json
+│   └── vite.config.js
+│
+├── Stage1/
+├── Stage2/
+├── Stage3/
+├── Stage4/
+├── Stage5/
+├── Stage6/
+├── Stage7/
+│   └── main.py
+│
+├── .env.example
+├── .gitignore
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Running the Project
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/TayyibaFatima/AI-Appointment-Assistant.git
+cd AI-Appointment-Assistant
+```
+
+### 2. Create and activate a virtual environment
+
+```bash
 python -m venv venv
 ```
 
-## 3. Activate the environment
+Windows PowerShell:
 
 ```powershell
 .\venv\Scripts\Activate.ps1
 ```
 
-## 4. Install dependencies
+### 3. Install backend dependencies
 
-```powershell
-pip install groq python-dotenv pydantic psycopg2-binary fastapi uvicorn
+```bash
+pip install -r requirements.txt
 ```
 
-## 5. Configure environment variables
+### 4. Configure environment variables
 
-Create a `.env` file:
+Create a `.env` file using `.env.example` and add:
 
-```text
-GROQ_API_KEY=your_api_key
+```env
+GROQ_API_KEY=your_groq_api_key
 
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=your_database
-POSTGRES_USER=your_user
+POSTGRES_USER=your_username
 POSTGRES_PASSWORD=your_password
 ```
 
-## 6. Configure PostgreSQL
+### 5. Start the FastAPI backend
 
-Create the required database and tables before starting the application.
-
-The application expects the database to contain the required doctor and appointment data.
-
-## 7. Start the FastAPI server
-
-```powershell
+```bash
 uvicorn Stage7.main:app --reload
 ```
 
@@ -750,113 +457,96 @@ Swagger documentation:
 http://127.0.0.1:8000/docs
 ```
 
----
+### 6. Start the React frontend
 
-# Git Development History
+Open another terminal:
 
-The project is divided into Git stages to preserve the development progression:
-
-```text
-stage-1
-    Gemini API + basic tool calling
-
-stage-2
-    Structured output + appointment extraction
-
-stage-3
-    PostgreSQL + Python-controlled workflow
-
-stage-4
-    Groq function/tool calling + agent loop
-
-stage-5
-    FastAPI backend
-
-stage-6
-    Session-based integration
-
-stage-7
-    Reliable session state + improved tool flow
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-This progression demonstrates how the system evolved from a basic LLM experiment into an integrated AI backend.
+The frontend will be available at:
+
+```text
+http://localhost:5173
+```
 
 ---
 
-# Project Evolution
+## API Endpoints
 
-```text
-LLM API
-   ↓
-Structured Output
-   ↓
-Tool Calling
-   ↓
-PostgreSQL
-   ↓
-AI Agent Loop
-   ↓
-FastAPI
-   ↓
-Session State
-   ↓
-Reliable AI Backend
-```
-
-The main architectural progression was from:
-
-```text
-User → LLM → Answer
-```
-
-to:
-
-```text
-User
- ↓
-LLM
- ↓
-Decision
- ↓
-Tool
- ↓
-Python
- ↓
-Database / Application State
- ↓
-Tool Result
- ↓
-LLM
- ↓
-User
-```
-
-This project demonstrates how LLMs can be integrated with deterministic application logic, persistent data, tools, and backend APIs to build a more reliable AI application.
+| Method | Endpoint                    | Description                        |
+| ------ | --------------------------- | ---------------------------------- |
+| GET    | `/`                         | API information                    |
+| GET    | `/health`                   | Backend health check               |
+| POST   | `/chat`                     | Send a message to the AI assistant |
+| GET    | `/appointment/{session_id}` | Retrieve appointment state         |
+| DELETE | `/appointment/{session_id}` | Reset appointment state            |
 
 ---
 
-# Future Improvements
+## Security
 
-Potential future improvements include:
+* API keys are stored in environment variables.
+* `.env` is excluded from Git using `.gitignore`.
+* `.env.example` contains only placeholder values.
+* Database credentials are not committed to the repository.
+* The LLM cannot directly execute arbitrary database operations.
+* Database operations are exposed through controlled backend tools.
 
-* Authentication and authorization
-* Production database deployment
-* Persistent session storage using Redis or a database
-* Appointment cancellation and rescheduling
-* Doctor-specific schedules
+---
+
+## Real-World Applications
+
+The architecture can be adapted for:
+
+* Medical clinics
+* Dental clinics
+* Aesthetic clinics
+* Salons
+* Healthcare scheduling systems
+* Customer service agents
+* Business appointment systems
+
+The same architecture can also be extended to messaging platforms such as WhatsApp.
+
+---
+
+## Future Improvements
+
+Potential improvements include:
+
+* WhatsApp integration
+* Authentication and user accounts
+* Redis-based session storage
+* Deployment to a cloud platform
 * Calendar integration
-* Production frontend
-* Deployment using Docker
-* Automated testing
-* Observability and logging
-* Evaluation of tool-calling accuracy and booking reliability
+* Appointment cancellation and rescheduling
+* Automated reminders
+* Multi-clinic support
+* Admin dashboard
+* Persistent conversation history
+* Improved evaluation and monitoring
 
 ---
 
 ## Project Status
 
-**Core AI appointment assistant:** Completed
+**Completed — Stage 7**
 
-**Current implementation:** FastAPI + Groq + PostgreSQL + session-based state + tool calling
+The current version demonstrates a complete AI-powered appointment workflow using:
 
-The project is primarily intended as an AI engineering project demonstrating the integration of **LLMs, tools, structured data, databases, state management, and backend APIs**.
+* Groq
+* GPT-OSS-20B
+* LLM Tool Calling
+* PostgreSQL
+* Session-Based State
+* FastAPI
+* React
+* Real database-backed appointment booking
+
+Repository:
+
+https://github.com/TayyibaFatima/AI-Appointment-Assistant
