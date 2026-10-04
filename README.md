@@ -28,15 +28,15 @@ The current implementation uses **Groq with GPT-OSS-20B** for LLM-based tool cal
 
 ### AI Appointment Assistant — Main Interface
 
-![AI Appointment Assistant](screenshots/frontend-main.png)
+![AI Appointment Assistant](screenshots/conversation.png)
 
 ### Appointment Booking Conversation
 
-![Appointment Booking Conversation](screenshots/frontend-conversation.png)
+![Appointment Booking Conversation](screenshots/conversation%28%282%29.png)
 
 ### Successful Appointment Booking
 
-![Successful Appointment Booking](screenshots/frontend-booking.png)
+![Successful Appointment Booking](screenshots/booking.png)
 
 ### FastAPI Backend — Swagger UI
 
@@ -230,7 +230,7 @@ Booking confirmation
 
 * PostgreSQL
 * SQL queries
-* Transaction-safe appointment booking
+* Database-backed appointment booking
 
 ### Frontend
 
@@ -250,7 +250,7 @@ Booking confirmation
 
 ## Development Journey
 
-The project was developed incrementally to demonstrate the evolution from a simple appointment application into an AI-powered backend system.
+The project was developed incrementally to demonstrate the evolution from a basic appointment application into an AI-powered backend system.
 
 ### Stage 1 — Basic Appointment System
 
@@ -390,6 +390,12 @@ AI_Appointment_Assistant/
 ├── Stage7/
 │   └── main.py
 │
+├── screenshots/
+│   ├── booking.png
+│   ├── conversation.png
+│   ├── conversation(2).png
+│   └── swagger.png
+│
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
@@ -407,7 +413,7 @@ git clone https://github.com/TayyibaFatima/AI-Appointment-Assistant.git
 cd AI-Appointment-Assistant
 ```
 
-### 2. Create and activate a virtual environment
+### 2. Create a virtual environment
 
 ```bash
 python -m venv venv
@@ -521,7 +527,7 @@ Potential improvements include:
 * WhatsApp integration
 * Authentication and user accounts
 * Redis-based session storage
-* Deployment to a cloud platform
+* Cloud deployment
 * Calendar integration
 * Appointment cancellation and rescheduling
 * Automated reminders
