@@ -1,3 +1,6 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import os
 import json
 from datetime import date, datetime, time as dt_time
@@ -6,9 +9,6 @@ import psycopg2
 from psycopg2 import errors
 from dotenv import load_dotenv
 from groq import Groq
-
-from fastapi import FastAPI
-from pydantic import BaseModel
 
 
 # ============================================================
@@ -33,7 +33,16 @@ app = FastAPI(
     title="AI Appointment Assistant",
     version="Stage 7"
 )
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 # ============================================================
 # SESSION STORAGE
