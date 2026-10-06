@@ -1,17 +1,55 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Primary (terracotta) */
+  --primary: #c2704e;
+  --primary-strong: #8f4526;
+  --primary-hover: #7a3a20;
+  --primary-tint: #f6e4da;
+
+  /* Secondary (forest green) */
+  --secondary: #2f6f55;
+  --secondary-strong: #245844;
+  --secondary-tint: #d8eee3;
+
+  /* Tertiary (sand) */
+  --tertiary: #e3d5c0;
+  --tertiary-soft: #f3ece0;
+  --tertiary-dark: #6b6150;
+
+  /* Neutral */
+  --neutral: #1e2022;
+  --neutral-muted: #5a5048;
+  --surface: #ffffff;
+  --background: #f8f4ee;
+  --border: #e6dccd;
+
+  --danger: #b91c1c;
+  --danger-tint: #fde8e6;
+
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-body: "Plus Jakarta Sans", Arial, Helvetica, sans-serif;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: #f5f7fb;
-  color: #1f2937;
+  font-family: var(--font-body);
+  background: var(--background);
+  color: var(--neutral);
 }
 
 button,
 input {
   font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary-strong);
+  outline-offset: 2px;
 }
 
 .app {
@@ -20,10 +58,12 @@ input {
   flex-direction: column;
 }
 
+/* ---------- Top bar ---------- */
+
 .topbar {
-  height: 76px;
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
+  height: 80px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -32,14 +72,16 @@ input {
 
 .topbar h1 {
   margin: 0;
-  font-size: 22px;
-  color: #111827;
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--primary-strong);
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .topbar p {
-  margin: 5px 0 0;
-  color: #4b5563;
+  margin: 4px 0 0;
+  color: var(--neutral-muted);
   font-size: 13px;
 }
 
@@ -47,17 +89,22 @@ input {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--secondary-strong);
+  background: var(--secondary-tint);
+  padding: 7px 14px;
+  border-radius: 999px;
 }
 
 .status-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #22c55e;
+  background: var(--secondary);
 }
+
+/* ---------- Layout ---------- */
 
 .main-container {
   width: 90%;
@@ -71,9 +118,9 @@ input {
 
 .chat-card,
 .appointment-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
   overflow: hidden;
 }
 
@@ -85,23 +132,27 @@ input {
 
 .chat-header {
   padding: 22px 25px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
+  background: var(--tertiary-soft);
 }
 
 .chat-header h2,
 .appointment-header h2 {
   margin: 0;
-  font-size: 18px;
-  color: #111827;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 21px;
+  color: var(--neutral);
+  font-weight: 600;
 }
 
 .chat-header p,
 .appointment-header p {
   margin: 5px 0 0;
-  color: #4b5563;
+  color: var(--neutral-muted);
   font-size: 13px;
 }
+
+/* ---------- Messages ---------- */
 
 .messages {
   flex: 1;
@@ -125,67 +176,80 @@ input {
 .message {
   max-width: 70%;
   padding: 12px 16px;
-  border-radius: 14px;
-  line-height: 1.5;
+  border-radius: 16px;
+  line-height: 1.55;
   font-size: 14px;
   white-space: pre-wrap;
 }
 
 .message-row.user .message {
-  background: #2563eb;
-  color: white;
+  background: var(--primary-strong);
+  color: #ffffff;
   border-bottom-right-radius: 4px;
 }
 
 .message-row.assistant .message {
-  background: #f1f5f9;
-  color: #1f2937;
+  background: var(--tertiary-soft);
+  color: var(--neutral);
+  border: 1px solid var(--border);
   border-bottom-left-radius: 4px;
 }
 
 .typing {
-  color: #4b5563;
+  color: var(--neutral-muted);
 }
+
+/* ---------- Input ---------- */
 
 .input-area {
   display: flex;
   gap: 10px;
   padding: 18px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .input-area input {
   flex: 1;
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
+  border: 1px solid var(--tertiary);
+  border-radius: 12px;
   padding: 12px 14px;
   outline: none;
-  color: #111827;
-  background: white;
+  color: var(--neutral);
+  background: var(--background);
 }
 
 .input-area input::placeholder {
-  color: #6b7280;
+  color: var(--neutral-muted);
+  opacity: 0.8;
 }
 
 .input-area input:focus {
-  border-color: #2563eb;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-tint);
 }
 
 .input-area button {
   border: none;
-  border-radius: 10px;
-  padding: 0 22px;
-  background: #2563eb;
-  color: white;
+  border-radius: 12px;
+  padding: 0 24px;
+  background: var(--primary-strong);
+  color: #ffffff;
   cursor: pointer;
   font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.input-area button:hover:not(:disabled) {
+  background: var(--primary-hover);
 }
 
 .input-area button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ---------- Appointment card ---------- */
 
 .appointment-card {
   padding: 25px;
@@ -199,12 +263,12 @@ input {
 }
 
 .session-badge {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--secondary-tint);
+  color: var(--secondary-strong);
   padding: 5px 10px;
   border-radius: 20px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .details {
@@ -213,75 +277,83 @@ input {
 
 .detail {
   padding: 15px 0;
-  border-bottom: 1px solid #edf0f3;
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
 
 .detail span {
-  color: #374151;
+  color: var(--tertiary-dark);
   font-size: 12px;
   font-weight: 600;
 }
 
 .detail strong {
   font-size: 14px;
-  color: #111827;
+  color: var(--neutral);
+  font-weight: 600;
 }
 
 .booking-status {
   margin-top: 25px;
   padding: 15px;
-  background: #f8fafc;
-  border-radius: 10px;
+  background: var(--tertiary-soft);
+  border: 1px solid var(--tertiary);
+  border-left: 4px solid var(--secondary);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
 
 .booking-status span {
-  color: #374151;
+  color: var(--tertiary-dark);
   font-size: 12px;
   font-weight: 600;
 }
 
 .booking-status strong {
   font-size: 14px;
-  color: #111827;
+  color: var(--secondary-strong);
 }
 
 .reset-button {
   width: 100%;
   margin-top: 20px;
   padding: 11px;
-  border: 1px solid #d1d5db;
-  background: white;
-  color: #111827;
-  border-radius: 9px;
+  border: 1px solid var(--tertiary-dark);
+  background: transparent;
+  color: var(--neutral);
+  border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
+  transition: background 0.15s ease;
 }
 
 .reset-button:hover {
-  background: #f9fafb;
+  background: var(--tertiary-soft);
 }
+
+/* ---------- Error + footer ---------- */
 
 .error {
   margin: 0 18px 10px;
-  padding: 10px;
-  border-radius: 8px;
-  background: #fee2e2;
-  color: #991b1b;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--danger-tint);
+  color: var(--danger);
   font-size: 13px;
 }
 
 footer {
   text-align: center;
   padding: 20px;
-  color: #4b5563;
+  color: var(--neutral-muted);
   font-size: 12px;
 }
+
+/* ---------- Responsive ---------- */
 
 @media (max-width: 850px) {
   .main-container {
@@ -303,7 +375,7 @@ footer {
   }
 
   .topbar h1 {
-    font-size: 17px;
+    font-size: 20px;
   }
 
   .backend-status {

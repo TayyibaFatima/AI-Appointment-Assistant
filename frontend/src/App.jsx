@@ -334,7 +334,7 @@ function App() {
       </main>
 
       <footer>
-        AI Appointment Assistant • Stage 7
+        AI Appointment Assistant 
       </footer>
 
     </div>
