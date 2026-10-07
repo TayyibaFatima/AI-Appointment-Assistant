@@ -5,17 +5,11 @@ const API_URL = "https://ai-appointment-assistant.fastapicloud.dev";
 
 function App() {
   const [sessionId] = useState(() => {
-    let id = localStorage.getItem("appointment_session_id");
-
-    if (!id) {
-      id = "web-user-" + Date.now();
-      localStorage.setItem("appointment_session_id", id);
-    }
-
-    return id;
-  });
+  return "web-user-" + Date.now();
+});
 
   const [message, setMessage] = useState("");
+
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -112,6 +106,7 @@ function App() {
       setAvailabilityChecked(data.availability_checked);
       setAwaitingConfirmation(data.awaiting_confirmation);
       setBookingCompleted(data.booking_completed);
+
     } catch (error) {
       setError(
         "Unable to connect to the appointment assistant."
@@ -150,6 +145,7 @@ function App() {
       ]);
 
       setError("");
+
     } catch (error) {
       setError("Could not reset the appointment.");
     }
@@ -173,8 +169,10 @@ function App() {
   }
 
   function getStatus() {
+
+    // Successful booking gets highest priority.
     if (bookingCompleted) {
-      return "Booking completed";
+      return "Booked";
     }
 
     if (awaitingConfirmation) {
@@ -201,6 +199,7 @@ function App() {
     <div className="app">
 
       <header className="topbar">
+
         <div>
           <h1>AI Appointment Assistant</h1>
           <p>Smart clinic appointment booking</p>
@@ -210,6 +209,7 @@ function App() {
           <span className="status-dot"></span>
           AI Assistant
         </div>
+
       </header>
 
       <main className="main-container">
@@ -217,10 +217,12 @@ function App() {
         <section className="chat-card">
 
           <div className="chat-header">
+
             <div>
               <h2>Appointment Assistant</h2>
               <p>Book your clinic appointment through chat</p>
             </div>
+
           </div>
 
           <div className="messages">
@@ -239,7 +241,13 @@ function App() {
             {loading && (
               <div className="message-row assistant">
                 <div className="message typing">
-                  Thinking...
+                  ⏳ Waking up the AI assistant...
+                  <br />
+                  <small>
+                    This may take up to about 1 minute on the first request.
+                    <br />
+                    Thanks for your patience!
+                  </small>
                 </div>
               </div>
             )}
@@ -283,6 +291,7 @@ function App() {
         <aside className="appointment-card">
 
           <div className="appointment-header">
+
             <div>
               <h2>Appointment</h2>
               <p>Current booking details</p>
@@ -291,6 +300,7 @@ function App() {
             <span className="session-badge">
               Active
             </span>
+
           </div>
 
           <div className="details">
@@ -318,8 +328,13 @@ function App() {
           </div>
 
           <div className="booking-status">
+
             <span>Status</span>
-            <strong>{getStatus()}</strong>
+
+            <strong>
+              {getStatus()}
+            </strong>
+
           </div>
 
           <button
@@ -334,7 +349,7 @@ function App() {
       </main>
 
       <footer>
-        AI Appointment Assistant 
+        AI Appointment Assistant
       </footer>
 
     </div>
@@ -356,3 +371,4 @@ function Detail({ label, value }) {
 }
 
 export default App;
+
