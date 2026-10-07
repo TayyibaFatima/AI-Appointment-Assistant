@@ -43,6 +43,9 @@ function App() {
   // Controls which loading message is displayed.
   const [showWakeUp, setShowWakeUp] = useState(true);
 
+  // Controls the reset confirmation popup.
+  const [showResetPopup, setShowResetPopup] = useState(false);
+
 
   useEffect(() => {
     loadAppointment();
@@ -155,16 +158,35 @@ function App() {
   }
 
 
-  async function resetAppointment() {
+  // Opens the confirmation popup.
+  function requestReset() {
+    setShowResetPopup(true);
+  }
+
+
+  // Closes the confirmation popup.
+  function cancelReset() {
+    setShowResetPopup(false);
+  }
+
+
+  // Performs the actual reset after user confirmation.
+  async function confirmReset() {
+
+    setShowResetPopup(false);
 
     try {
 
-      await fetch(
+      const response = await fetch(
         `${API_URL}/appointment/${sessionId}`,
         {
           method: "DELETE"
         }
       );
+
+      if (!response.ok) {
+        throw new Error("Reset request failed.");
+      }
 
       setAppointment({
         patient_name: null,
@@ -472,7 +494,7 @@ function App() {
 
           <button
             className="reset-button"
-            onClick={resetAppointment}
+            onClick={requestReset}
           >
             Reset Appointment
           </button>
@@ -487,6 +509,49 @@ function App() {
       <footer>
         AI Appointment Assistant
       </footer>
+
+
+      {/* RESET CONFIRMATION POPUP */}
+
+      {showResetPopup && (
+
+        <div className="modal-overlay">
+
+          <div className="reset-modal">
+
+            <h2>
+              Start over?
+            </h2>
+
+            <p>
+              This will clear your current appointment
+              details. It will not cancel an already
+              booked appointment.
+            </p>
+
+            <div className="modal-buttons">
+
+              <button
+                className="modal-cancel"
+                onClick={cancelReset}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="modal-confirm"
+                onClick={confirmReset}
+              >
+                Start Over
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
 
     </div>
@@ -509,7 +574,6 @@ function Detail({ label, value }) {
       </strong>
 
     </div>
-
   );
 }
 
