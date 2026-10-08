@@ -1040,6 +1040,10 @@ class ChatRequest(BaseModel):
 # CHAT ENDPOINT
 # ============================================================
 
+# ============================================================
+# CHAT ENDPOINT
+# ============================================================
+
 @app.post("/chat")
 def chat(request: ChatRequest):
 
@@ -1047,15 +1051,106 @@ def chat(request: ChatRequest):
         request.session_id
     )
 
-    # Remember whether the patient name existed BEFORE
-    # the current user message.
     patient_name_before_message = (
         session["appointment"]["patient_name"]
     )
 
-    # Tracks whether the patient name was updated during
-    # this specific user turn.
-    patient_name_updated_this_turn = False
+    appointment = session["appointment"]
+
+    # ========================================================
+    # DIRECT CONFIRMATION DETECTION
+    # ========================================================
+
+    user_message = request.message.strip().lower()
+
+    confirmation_phrases = [
+        "yes",
+        "yes please",
+        "yes book it",
+        "yes, book it",
+        "book it",
+        "confirm",
+        "confirmed",
+        "please book it",
+        "book the appointment",
+        "go ahead",
+        "go ahead and book it"
+    ]
+
+    is_explicit_confirmation = (
+        user_message in confirmation_phrases
+    )
+
+    # ========================================================
+    # DIRECT BOOKING
+    #
+    # If the assistant already asked for confirmation and the
+    # user gives a clear confirmation, book immediately.
+    # ========================================================
+
+    if (
+        is_explicit_confirmation
+        and session["availability_checked"]
+        and session["awaiting_confirmation"]
+        and appointment["patient_name"]
+        and appointment["doctor"]
+        and appointment["date"]
+        and appointment["time"]
+    ):
+
+        booking_result = book_appointment(
+            session
+        )
+
+        if booking_result["success"]:
+
+            patient_name = appointment["patient_name"]
+            doctor = appointment["doctor"]
+            appointment_date = appointment["date"]
+            appointment_time = appointment["time"]
+
+            final_message = (
+                f"Your appointment has been booked successfully!\n\n"
+                f"**Patient:** {patient_name}\n"
+                f"**Doctor:** {doctor}\n"
+                f"**Date:** {appointment_date}\n"
+                f"**Time:** {appointment_time}"
+            )
+
+        else:
+
+            final_message = booking_result["message"]
+
+        # Save this user message and assistant response.
+        session["messages"].append(
+            {
+                "role": "user",
+                "content": request.message
+            }
+        )
+
+        session["messages"].append(
+            {
+                "role": "assistant",
+                "content": final_message
+            }
+        )
+
+        return {
+            "session_id": request.session_id,
+            "response": final_message,
+            "appointment": session["appointment"],
+            "availability_checked":
+                session["availability_checked"],
+            "awaiting_confirmation":
+                session["awaiting_confirmation"],
+            "booking_completed":
+                session["booking_completed"]
+        }
+
+    # ========================================================
+    # NORMAL GROQ FLOW
+    # ========================================================
 
     appointment_state = json.dumps(
         session["appointment"]
@@ -1122,6 +1217,8 @@ def chat(request: ChatRequest):
     # TOOL-CALL LOOP
     # ========================================================
 
+    patient_name_updated_this_turn = False
+
     while assistant_message.tool_calls:
 
         serialized_message = serialize_assistant_message(
@@ -1147,7 +1244,7 @@ def chat(request: ChatRequest):
                 arguments = {}
 
             # ------------------------------------------------
-            # Track patient-name updates during this turn.
+            # Track patient-name updates.
             # ------------------------------------------------
 
             if (
@@ -1158,11 +1255,8 @@ def chat(request: ChatRequest):
                 patient_name_updated_this_turn = True
 
             # ------------------------------------------------
-            # HARD SAFETY GUARD
-            #
-            # If the patient name was newly supplied during
-            # this turn, booking is NOT allowed in the same
-            # turn.
+            # NEVER allow booking in the same turn in which
+            # a patient name was supplied.
             # ------------------------------------------------
 
             if (
@@ -1173,11 +1267,9 @@ def chat(request: ChatRequest):
                 tool_result = {
                     "success": False,
                     "message": (
-                        "The patient name was provided in this "
-                        "same user turn. Do NOT book yet. "
-                        "The assistant must ask the user for "
-                        "explicit booking confirmation in a "
-                        "separate turn first."
+                        "The patient name was just provided. "
+                        "Do not book yet. Ask the user for "
+                        "explicit booking confirmation."
                     )
                 }
 
@@ -1199,14 +1291,14 @@ def chat(request: ChatRequest):
                 }
             )
 
-        # ====================================================
-        # ASK GROQ WHAT TO DO AFTER TOOL RESULTS
-        # ====================================================
+        # ----------------------------------------------------
+        # Updated state after tools.
+        # ----------------------------------------------------
 
         updated_state_message = {
             "role": "system",
             "content": (
-                "UPDATED CURRENT APPOINTMENT STATE FROM PYTHON:\n"
+                "UPDATED CURRENT APPOINTMENT STATE:\n"
                 + json.dumps(session["appointment"])
                 + "\n\n"
                 "UPDATED FLAGS:\n"
@@ -1221,7 +1313,7 @@ def chat(request: ChatRequest):
                     }
                 )
                 + "\n\n"
-                "The Python state is authoritative."
+                "Python state is authoritative."
             )
         }
 
@@ -1241,23 +1333,10 @@ def chat(request: ChatRequest):
         assistant_message = response.choices[0].message
 
     # ========================================================
-    # FINAL ASSISTANT RESPONSE
+    # FINAL RESPONSE
     # ========================================================
 
     final_message = assistant_message.content or ""
-
-    # Extra protection against an accidental booking response
-    # when the name was supplied for the first time this turn.
-    if (
-        patient_name_updated_this_turn
-        and session["booking_completed"]
-        and patient_name_before_message is None
-    ):
-
-        # This should normally never be reached because the
-        # hard tool guard above blocks the booking.
-        # It exists as an additional safety layer.
-        session["booking_completed"] = False
 
     messages.append(
         serialize_assistant_message(
@@ -1266,7 +1345,7 @@ def chat(request: ChatRequest):
     )
 
     # ========================================================
-    # SAVE CONVERSATION HISTORY
+    # SAVE CONVERSATION
     # ========================================================
 
     conversation_messages = []
@@ -1282,7 +1361,7 @@ def chat(request: ChatRequest):
     session["messages"] = conversation_messages
 
     # ========================================================
-    # RETURN CURRENT PYTHON STATE
+    # RETURN STATE
     # ========================================================
 
     return {
@@ -1296,7 +1375,6 @@ def chat(request: ChatRequest):
         "booking_completed":
             session["booking_completed"]
     }
-
 
 # ============================================================
 # GET CURRENT APPOINTMENT
