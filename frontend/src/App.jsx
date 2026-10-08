@@ -3,15 +3,30 @@ import "./App.css";
 
 const API_URL = "https://ai-appointment-assistant.fastapicloud.dev";
 
-// Show wake-up message after 5 minutes of inactivity.
 const INACTIVITY_LIMIT = 5 * 60 * 1000;
+const APP_ACTIVITY_KEY = "appointment_app_last_activity";
+
+const EMPTY_APPOINTMENT = {
+  patient_name: null,
+  doctor: null,
+  date: null,
+  time: null
+};
 
 function App() {
+  // ------------------------------------------------------------
+  // SESSION
+  // ------------------------------------------------------------
 
-  // Create a completely new session whenever the page is refreshed.
+  // A new appointment session is created when the page is loaded.
+  // This is separate from the app-wide inactivity timer.
   const [sessionId] = useState(() => {
     return "web-user-" + Date.now();
   });
+
+  // ------------------------------------------------------------
+  // CHAT STATE
+  // ------------------------------------------------------------
 
   const [message, setMessage] = useState("");
 
@@ -23,39 +38,48 @@ function App() {
     }
   ]);
 
-  const [appointment, setAppointment] = useState({
-    patient_name: null,
-    doctor: null,
-    date: null,
-    time: null
-  });
+  // ------------------------------------------------------------
+  // APPOINTMENT STATE
+  // ------------------------------------------------------------
 
-  const [availabilityChecked, setAvailabilityChecked] = useState(false);
-  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
-  const [bookingCompleted, setBookingCompleted] = useState(false);
+  const [appointment, setAppointment] = useState(
+    EMPTY_APPOINTMENT
+  );
+
+  const [availabilityChecked, setAvailabilityChecked] =
+    useState(false);
+
+  const [awaitingConfirmation, setAwaitingConfirmation] =
+    useState(false);
+
+  const [bookingCompleted, setBookingCompleted] =
+    useState(false);
+
+  // ------------------------------------------------------------
+  // UI STATE
+  // ------------------------------------------------------------
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Stores the time of the previous completed request.
-  const [lastActivity, setLastActivity] = useState(null);
+  const [showWakeUp, setShowWakeUp] = useState(false);
 
-  // Controls which loading message is displayed.
-  const [showWakeUp, setShowWakeUp] = useState(true);
-
-  // Controls the reset confirmation popup.
   const [showResetPopup, setShowResetPopup] = useState(false);
 
+  // ------------------------------------------------------------
+  // INITIAL LOAD
+  // ------------------------------------------------------------
 
   useEffect(() => {
     loadAppointment();
   }, []);
 
+  // ------------------------------------------------------------
+  // LOAD APPOINTMENT STATE
+  // ------------------------------------------------------------
 
   async function loadAppointment() {
-
     try {
-
       const response = await fetch(
         `${API_URL}/appointment/${sessionId}`
       );
@@ -67,35 +91,81 @@ function App() {
       const data = await response.json();
 
       setAppointment(data.appointment);
-      setAvailabilityChecked(data.availability_checked);
-      setAwaitingConfirmation(data.awaiting_confirmation);
-      setBookingCompleted(data.booking_completed);
-
+      setAvailabilityChecked(
+        data.availability_checked
+      );
+      setAwaitingConfirmation(
+        data.awaiting_confirmation
+      );
+      setBookingCompleted(
+        data.booking_completed
+      );
     } catch (error) {
-
-      console.log("Could not load appointment state.");
-
+      console.log(
+        "Could not load appointment state."
+      );
     }
   }
 
+  // ------------------------------------------------------------
+  // APP ACTIVITY
+  // ------------------------------------------------------------
+
+  function getLastAppActivity() {
+    const storedActivity = localStorage.getItem(
+      APP_ACTIVITY_KEY
+    );
+
+    if (!storedActivity) {
+      return null;
+    }
+
+    const timestamp = Number(storedActivity);
+
+    if (Number.isNaN(timestamp)) {
+      return null;
+    }
+
+    return timestamp;
+  }
+
+  function updateAppActivity() {
+    localStorage.setItem(
+      APP_ACTIVITY_KEY,
+      Date.now().toString()
+    );
+  }
+
+  function shouldShowWakeUp() {
+    const lastActivity = getLastAppActivity();
+
+    // First-ever use of the app should NOT show wake-up.
+    if (lastActivity === null) {
+      return false;
+    }
+
+    return (
+      Date.now() - lastActivity >=
+      INACTIVITY_LIMIT
+    );
+  }
+
+  // ------------------------------------------------------------
+  // SEND MESSAGE
+  // ------------------------------------------------------------
 
   async function sendMessage() {
-
     const trimmedMessage = message.trim();
 
     if (!trimmedMessage || loading) {
       return;
     }
 
-    // Determine whether this request should show
-    // the wake-up message BEFORE changing lastActivity.
-    const now = Date.now();
+    // The timer belongs to the application, not
+    // to the current appointment session.
+    const wakeUpRequired = shouldShowWakeUp();
 
-    const shouldWakeUp =
-      lastActivity === null ||
-      now - lastActivity >= INACTIVITY_LIMIT;
-
-    setShowWakeUp(shouldWakeUp);
+    setShowWakeUp(wakeUpRequired);
 
     setMessages((previous) => [
       ...previous,
@@ -110,20 +180,24 @@ function App() {
     setError("");
 
     try {
-
-      const response = await fetch(`${API_URL}/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          session_id: sessionId,
-          message: trimmedMessage
-        })
-      });
+      const response = await fetch(
+        `${API_URL}/chat`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            message: trimmedMessage
+          })
+        }
+      );
 
       if (!response.ok) {
-        throw new Error("Backend request failed.");
+        throw new Error(
+          "Backend request failed."
+        );
       }
 
       const data = await response.json();
@@ -137,46 +211,53 @@ function App() {
       ]);
 
       setAppointment(data.appointment);
-      setAvailabilityChecked(data.availability_checked);
-      setAwaitingConfirmation(data.awaiting_confirmation);
-      setBookingCompleted(data.booking_completed);
 
-    } catch (error) {
-
-      setError(
-        "Unable to connect to the appointment assistant."
+      setAvailabilityChecked(
+        data.availability_checked
       );
 
+      setAwaitingConfirmation(
+        data.awaiting_confirmation
+      );
+
+      setBookingCompleted(
+        data.booking_completed
+      );
+
+      // Update the APP-WIDE activity timestamp.
+      // This is intentionally NOT stored in the session.
+      updateAppActivity();
+
+      // Backend can also tell us whether it detected
+      // that its own activity was idle for 5+ minutes.
+      if (data.wake_up === true) {
+        setShowWakeUp(true);
+      }
+    } catch (error) {
+      setError(
+        "Unable to connect to the appointment assistant. Please try again."
+      );
     } finally {
-
-      // Mark this request as the latest activity
-      // after the request has finished.
-      setLastActivity(Date.now());
-
       setLoading(false);
     }
   }
 
+  // ------------------------------------------------------------
+  // RESET APPOINTMENT
+  // ------------------------------------------------------------
 
-  // Opens the confirmation popup.
   function requestReset() {
     setShowResetPopup(true);
   }
 
-
-  // Closes the confirmation popup.
   function cancelReset() {
     setShowResetPopup(false);
   }
 
-
-  // Performs the actual reset after user confirmation.
   async function confirmReset() {
-
     setShowResetPopup(false);
 
     try {
-
       const response = await fetch(
         `${API_URL}/appointment/${sessionId}`,
         {
@@ -185,15 +266,12 @@ function App() {
       );
 
       if (!response.ok) {
-        throw new Error("Reset request failed.");
+        throw new Error(
+          "Reset request failed."
+        );
       }
 
-      setAppointment({
-        patient_name: null,
-        doctor: null,
-        date: null,
-        time: null
-      });
+      setAppointment(EMPTY_APPOINTMENT);
 
       setAvailabilityChecked(false);
       setAwaitingConfirmation(false);
@@ -209,17 +287,20 @@ function App() {
 
       setError("");
 
+      // Resetting an appointment is still app activity.
+      updateAppActivity();
     } catch (error) {
-
       setError(
-        "Could not reset the appointment."
+        "Could not reset the appointment. Please try again."
       );
     }
   }
 
+  // ------------------------------------------------------------
+  // FORMAT DATE
+  // ------------------------------------------------------------
 
   function formatDate(date) {
-
     if (!date) {
       return "Not provided";
     }
@@ -238,10 +319,11 @@ function App() {
     );
   }
 
+  // ------------------------------------------------------------
+  // APPOINTMENT STATUS
+  // ------------------------------------------------------------
 
   function getStatus() {
-
-    // Successful booking gets highest priority.
     if (bookingCompleted) {
       return "Booked";
     }
@@ -266,15 +348,20 @@ function App() {
     return "Ready to book";
   }
 
+  // ------------------------------------------------------------
+  // RENDER
+  // ------------------------------------------------------------
 
   return (
     <div className="app">
 
+      {/* ======================================================
+          TOP BAR
+          ====================================================== */}
 
       <header className="topbar">
 
         <div>
-
           <h1>
             AI Appointment Assistant
           </h1>
@@ -282,31 +369,31 @@ function App() {
           <p>
             Smart clinic appointment booking
           </p>
-
         </div>
 
-
         <div className="backend-status">
-
           <span className="status-dot"></span>
-
           AI Assistant
-
         </div>
 
       </header>
 
 
+      {/* ======================================================
+          MAIN CONTENT
+          ====================================================== */}
+
       <main className="main-container">
 
+        {/* ====================================================
+            CHAT
+            ==================================================== */}
 
         <section className="chat-card">
-
 
           <div className="chat-header">
 
             <div>
-
               <h2>
                 Appointment Assistant
               </h2>
@@ -314,14 +401,16 @@ function App() {
               <p>
                 Book your clinic appointment through chat
               </p>
-
             </div>
 
           </div>
 
 
-          <div className="messages">
+          {/* ==================================================
+              MESSAGES
+              ================================================== */}
 
+          <div className="messages">
 
             {messages.map((item, index) => (
 
@@ -331,15 +420,17 @@ function App() {
               >
 
                 <div className="message">
-
                   {item.content}
-
                 </div>
 
               </div>
 
             ))}
 
+
+            {/* =================================================
+                LOADING MESSAGE
+                ================================================= */}
 
             {loading && (
 
@@ -348,9 +439,9 @@ function App() {
                 <div className="message typing">
 
                   {showWakeUp ? (
-
                     <>
                       ⏳ Waking up the AI assistant...
+
                       <br />
 
                       <small>
@@ -360,11 +451,8 @@ function App() {
                         Thanks for your patience!
                       </small>
                     </>
-
                   ) : (
-
                     "Thinking..."
-
                   )}
 
                 </div>
@@ -373,21 +461,25 @@ function App() {
 
             )}
 
-
           </div>
 
 
-          {error && (
+          {/* ==================================================
+              ERROR
+              ================================================== */}
 
+          {error && (
             <div className="error">
               {error}
             </div>
-
           )}
 
 
-          <div className="input-area">
+          {/* ==================================================
+              INPUT
+              ================================================== */}
 
+          <div className="input-area">
 
             <input
               type="text"
@@ -397,15 +489,14 @@ function App() {
                 setMessage(event.target.value)
               }
               onKeyDown={(event) => {
-
-                if (event.key === "Enter") {
+                if (
+                  event.key === "Enter"
+                ) {
                   sendMessage();
                 }
-
               }}
               disabled={loading}
             />
-
 
             <button
               onClick={sendMessage}
@@ -417,20 +508,20 @@ function App() {
               Send
             </button>
 
-
           </div>
-
 
         </section>
 
 
-        <aside className="appointment-card">
+        {/* ====================================================
+            APPOINTMENT CARD
+            ==================================================== */}
 
+        <aside className="appointment-card">
 
           <div className="appointment-header">
 
             <div>
-
               <h2>
                 Appointment
               </h2>
@@ -438,9 +529,7 @@ function App() {
               <p>
                 Current booking details
               </p>
-
             </div>
-
 
             <span className="session-badge">
               Active
@@ -451,30 +540,27 @@ function App() {
 
           <div className="details">
 
-
             <Detail
               label="Patient"
               value={appointment.patient_name}
             />
-
 
             <Detail
               label="Doctor"
               value={appointment.doctor}
             />
 
-
             <Detail
               label="Date"
-              value={formatDate(appointment.date)}
+              value={formatDate(
+                appointment.date
+              )}
             />
-
 
             <Detail
               label="Time"
               value={appointment.time}
             />
-
 
           </div>
 
@@ -499,34 +585,46 @@ function App() {
             Reset Appointment
           </button>
 
-
         </aside>
-
 
       </main>
 
+
+      {/* ======================================================
+          FOOTER
+          ====================================================== */}
 
       <footer>
         AI Appointment Assistant
       </footer>
 
 
-      {/* RESET CONFIRMATION POPUP */}
+      {/* ======================================================
+          RESET CONFIRMATION MODAL
+          ====================================================== */}
 
       {showResetPopup && (
 
-        <div className="modal-overlay">
+        <div
+          className="modal-overlay"
+          onClick={cancelReset}
+        >
 
-          <div className="reset-modal">
+          <div
+            className="reset-modal"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
 
             <h2>
               Start over?
             </h2>
 
             <p>
-              This will clear your current appointment
-              details. It will not cancel an already
-              booked appointment.
+              This will clear your current
+              appointment details. It will not
+              cancel an already booked appointment.
             </p>
 
             <div className="modal-buttons">
@@ -553,16 +651,17 @@ function App() {
 
       )}
 
-
     </div>
   );
 }
 
 
+// ============================================================
+// DETAIL COMPONENT
+// ============================================================
+
 function Detail({ label, value }) {
-
   return (
-
     <div className="detail">
 
       <span>
@@ -579,4 +678,3 @@ function Detail({ label, value }) {
 
 
 export default App;
-

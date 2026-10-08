@@ -1,42 +1,65 @@
 @import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
 
+
+/* ============================================================
+   ROOT VARIABLES
+   ============================================================ */
+
 :root {
-  /* Primary (terracotta) */
+
   --primary: #c2704e;
   --primary-strong: #8f4526;
   --primary-hover: #7a3a20;
   --primary-tint: #f6e4da;
 
-  /* Secondary (forest green) */
   --secondary: #2f6f55;
   --secondary-strong: #245844;
   --secondary-tint: #d8eee3;
 
-  /* Tertiary (sand) */
   --tertiary: #e3d5c0;
   --tertiary-soft: #f3ece0;
   --tertiary-dark: #6b6150;
 
-  /* Neutral */
   --neutral: #1e2022;
   --neutral-muted: #5a5048;
+
   --surface: #ffffff;
   --background: #f8f4ee;
+
   --border: #e6dccd;
 
   --danger: #b91c1c;
   --danger-tint: #fde8e6;
 
-  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
-  --font-body: "Plus Jakarta Sans", Arial, Helvetica, sans-serif;
+  --font-display:
+    "Playfair Display",
+    Georgia,
+    "Times New Roman",
+    serif;
+
+  --font-body:
+    "Plus Jakarta Sans",
+    Arial,
+    Helvetica,
+    sans-serif;
 }
+
+
+/* ============================================================
+   GLOBAL
+   ============================================================ */
 
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
+  min-height: 100%;
+}
+
+body {
   font-family: var(--font-body);
   background: var(--background);
   color: var(--neutral);
@@ -47,10 +70,19 @@ input {
   font: inherit;
 }
 
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
 :focus-visible {
   outline: 2px solid var(--primary-strong);
   outline-offset: 2px;
 }
+
+
+/* ============================================================
+   APP
+   ============================================================ */
 
 .app {
   min-height: 100vh;
@@ -58,110 +90,173 @@ input {
   flex-direction: column;
 }
 
-/* ---------- Top bar ---------- */
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
 
 .topbar {
   height: 80px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   padding: 0 6%;
 }
 
 .topbar h1 {
   margin: 0;
+
   font-family: var(--font-display);
   font-size: 26px;
-  color: var(--primary-strong);
   font-weight: 700;
+
+  color: var(--primary-strong);
+
   letter-spacing: -0.01em;
 }
 
 .topbar p {
   margin: 4px 0 0;
+
   color: var(--neutral-muted);
   font-size: 13px;
 }
+
+
+/* ============================================================
+   BACKEND STATUS
+   ============================================================ */
 
 .backend-status {
   display: flex;
   align-items: center;
   gap: 8px;
+
   font-size: 13px;
   font-weight: 600;
+
   color: var(--secondary-strong);
+
   background: var(--secondary-tint);
+
   padding: 7px 14px;
+
   border-radius: 999px;
 }
 
 .status-dot {
   width: 9px;
   height: 9px;
+
   border-radius: 50%;
+
   background: var(--secondary);
 }
 
-/* ---------- Layout ---------- */
+
+/* ============================================================
+   MAIN LAYOUT
+   ============================================================ */
 
 .main-container {
   width: 90%;
   max-width: 1200px;
+
   margin: 35px auto;
+
   display: grid;
-  grid-template-columns: 1fr 350px;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    350px;
+
   gap: 25px;
+
   flex: 1;
 }
+
+
+/* ============================================================
+   CARDS
+   ============================================================ */
 
 .chat-card,
 .appointment-card {
   background: var(--surface);
+
   border: 1px solid var(--border);
+
   border-radius: 20px;
+
   overflow: hidden;
 }
 
+
+/* ============================================================
+   CHAT CARD
+   ============================================================ */
+
 .chat-card {
   min-height: 650px;
+
   display: flex;
   flex-direction: column;
 }
 
+
+/* ============================================================
+   CHAT HEADER
+   ============================================================ */
+
 .chat-header {
   padding: 22px 25px;
+
   border-bottom: 1px solid var(--border);
+
   background: var(--tertiary-soft);
 }
 
 .chat-header h2,
 .appointment-header h2 {
   margin: 0;
+
   font-family: var(--font-display);
+
   font-size: 21px;
-  color: var(--neutral);
   font-weight: 600;
+
+  color: var(--neutral);
 }
 
 .chat-header p,
 .appointment-header p {
   margin: 5px 0 0;
+
   color: var(--neutral-muted);
+
   font-size: 13px;
 }
 
-/* ---------- Messages ---------- */
+
+/* ============================================================
+   MESSAGES
+   ============================================================ */
 
 .messages {
   flex: 1;
+
   padding: 25px;
+
   overflow-y: auto;
 }
 
 .message-row {
   display: flex;
+
   margin-bottom: 15px;
 }
 
@@ -175,101 +270,192 @@ input {
 
 .message {
   max-width: 70%;
+
   padding: 12px 16px;
+
   border-radius: 16px;
+
   line-height: 1.55;
+
   font-size: 14px;
+
   white-space: pre-wrap;
+
+  overflow-wrap: anywhere;
 }
+
+
+/* User message */
 
 .message-row.user .message {
   background: var(--primary-strong);
+
   color: #ffffff;
+
   border-bottom-right-radius: 4px;
 }
 
+
+/* Assistant message */
+
 .message-row.assistant .message {
   background: var(--tertiary-soft);
+
   color: var(--neutral);
+
   border: 1px solid var(--border);
+
   border-bottom-left-radius: 4px;
 }
+
+
+/* Thinking / wake-up message */
 
 .typing {
   color: var(--neutral-muted);
 }
 
-/* ---------- Input ---------- */
+.typing small {
+  font-size: 11px;
+
+  line-height: 1.5;
+
+  color: var(--neutral-muted);
+}
+
+
+/* ============================================================
+   INPUT AREA
+   ============================================================ */
 
 .input-area {
   display: flex;
+
   gap: 10px;
+
   padding: 18px;
+
   border-top: 1px solid var(--border);
+
   background: var(--surface);
 }
 
 .input-area input {
   flex: 1;
+
+  min-width: 0;
+
   border: 1px solid var(--tertiary);
+
   border-radius: 12px;
+
   padding: 12px 14px;
+
   outline: none;
+
   color: var(--neutral);
+
   background: var(--background);
 }
 
 .input-area input::placeholder {
   color: var(--neutral-muted);
+
   opacity: 0.8;
 }
 
 .input-area input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-tint);
+
+  box-shadow:
+    0 0 0 3px var(--primary-tint);
 }
+
+.input-area input:disabled {
+  opacity: 0.7;
+}
+
+
+/* Send button */
 
 .input-area button {
   border: none;
+
   border-radius: 12px;
+
   padding: 0 24px;
+
   background: var(--primary-strong);
+
   color: #ffffff;
+
   cursor: pointer;
+
   font-weight: 600;
-  transition: background 0.15s ease;
+
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
 }
 
 .input-area button:hover:not(:disabled) {
   background: var(--primary-hover);
 }
 
+.input-area button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 .input-area button:disabled {
   opacity: 0.5;
+
   cursor: not-allowed;
 }
 
-/* ---------- Appointment card ---------- */
+
+/* ============================================================
+   APPOINTMENT CARD
+   ============================================================ */
 
 .appointment-card {
   padding: 25px;
+
   height: fit-content;
 }
 
 .appointment-header {
   display: flex;
+
   justify-content: space-between;
+
   align-items: flex-start;
+
+  gap: 15px;
 }
+
+
+/* Active badge */
 
 .session-badge {
   background: var(--secondary-tint);
+
   color: var(--secondary-strong);
+
   padding: 5px 10px;
+
   border-radius: 20px;
+
   font-size: 11px;
+
   font-weight: 700;
+
+  white-space: nowrap;
 }
+
+
+/* ============================================================
+   APPOINTMENT DETAILS
+   ============================================================ */
 
 .details {
   margin-top: 25px;
@@ -277,85 +463,311 @@ input {
 
 .detail {
   padding: 15px 0;
+
   border-bottom: 1px solid var(--border);
+
   display: flex;
+
   flex-direction: column;
+
   gap: 5px;
 }
 
 .detail span {
   color: var(--tertiary-dark);
+
   font-size: 12px;
+
   font-weight: 600;
 }
 
 .detail strong {
   font-size: 14px;
+
   color: var(--neutral);
+
   font-weight: 600;
+
+  overflow-wrap: anywhere;
 }
+
+
+/* ============================================================
+   BOOKING STATUS
+   ============================================================ */
 
 .booking-status {
   margin-top: 25px;
+
   padding: 15px;
+
   background: var(--tertiary-soft);
+
   border: 1px solid var(--tertiary);
+
   border-left: 4px solid var(--secondary);
+
   border-radius: 12px;
+
   display: flex;
+
   flex-direction: column;
+
   gap: 5px;
 }
 
 .booking-status span {
   color: var(--tertiary-dark);
+
   font-size: 12px;
+
   font-weight: 600;
 }
 
 .booking-status strong {
   font-size: 14px;
+
   color: var(--secondary-strong);
 }
 
+
+/* ============================================================
+   RESET BUTTON
+   ============================================================ */
+
 .reset-button {
   width: 100%;
+
   margin-top: 20px;
+
   padding: 11px;
+
   border: 1px solid var(--tertiary-dark);
+
   background: transparent;
+
   color: var(--neutral);
+
   border-radius: 10px;
+
   cursor: pointer;
+
   font-weight: 600;
-  transition: background 0.15s ease;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .reset-button:hover {
   background: var(--tertiary-soft);
+
+  border-color: var(--primary-strong);
 }
 
-/* ---------- Error + footer ---------- */
+
+/* ============================================================
+   ERROR
+   ============================================================ */
 
 .error {
   margin: 0 18px 10px;
+
   padding: 10px 12px;
+
   border-radius: 10px;
+
   background: var(--danger-tint);
+
   color: var(--danger);
+
+  border: 1px solid #f3c7c3;
+
   font-size: 13px;
+
+  line-height: 1.5;
 }
+
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
 
 footer {
   text-align: center;
+
   padding: 20px;
+
   color: var(--neutral-muted);
+
   font-size: 12px;
 }
 
-/* ---------- Responsive ---------- */
+
+/* ============================================================
+   RESET CONFIRMATION MODAL
+   ============================================================ */
+
+.modal-overlay {
+  position: fixed;
+
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  background: rgba(20, 18, 16, 0.48);
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 20px;
+
+  z-index: 9999;
+}
+
+
+/* Actual centered dialog */
+
+.reset-modal {
+  width: 100%;
+
+  max-width: 430px;
+
+  background: var(--surface);
+
+  border: 1px solid var(--border);
+
+  border-radius: 18px;
+
+  padding: 28px;
+
+  box-shadow:
+    0 25px 70px rgba(0, 0, 0, 0.25);
+
+  animation: modalAppear 0.16s ease-out;
+}
+
+
+/* Modal animation */
+
+@keyframes modalAppear {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(8px)
+      scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+}
+
+
+/* Modal title */
+
+.reset-modal h2 {
+  margin: 0 0 12px;
+
+  font-family: var(--font-display);
+
+  font-size: 24px;
+
+  font-weight: 600;
+
+  color: var(--neutral);
+}
+
+
+/* Modal description */
+
+.reset-modal p {
+  margin: 0;
+
+  line-height: 1.6;
+
+  color: var(--neutral-muted);
+
+  font-size: 14px;
+}
+
+
+/* Modal buttons */
+
+.modal-buttons {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 12px;
+
+  margin-top: 25px;
+}
+
+.modal-buttons button {
+  border: none;
+
+  border-radius: 9px;
+
+  padding: 10px 18px;
+
+  cursor: pointer;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
+}
+
+.modal-buttons button:hover {
+  opacity: 0.85;
+}
+
+.modal-buttons button:active {
+  transform: translateY(1px);
+}
+
+
+/* Cancel */
+
+.modal-cancel {
+  background: #e9e6e1;
+
+  color: var(--neutral);
+}
+
+
+/* Start Over */
+
+.modal-confirm {
+  background: var(--primary-strong);
+
+  color: #ffffff;
+}
+
+.modal-confirm:hover {
+  background: var(--primary-hover);
+}
+
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
 
 @media (max-width: 850px) {
+
   .main-container {
     grid-template-columns: 1fr;
   }
@@ -369,7 +781,9 @@ footer {
   }
 }
 
+
 @media (max-width: 600px) {
+
   .topbar {
     padding: 0 20px;
   }
@@ -384,10 +798,31 @@ footer {
 
   .main-container {
     width: 95%;
+
     margin: 15px auto;
   }
 
   .message {
     max-width: 85%;
+  }
+
+  .input-area {
+    padding: 12px;
+  }
+
+  .input-area button {
+    padding: 0 17px;
+  }
+
+  .reset-modal {
+    padding: 23px;
+  }
+
+  .modal-buttons {
+    flex-direction: column-reverse;
+  }
+
+  .modal-buttons button {
+    width: 100%;
   }
 }

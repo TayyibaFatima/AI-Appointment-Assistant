@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import json
+import time
+
 from datetime import date, datetime, time as dt_time
 
 import psycopg2
@@ -20,9 +22,13 @@ load_dotenv()
 groq_api_key = os.getenv("GROQ_API_KEY")
 
 if not groq_api_key:
-    raise ValueError("GROQ_API_KEY not found in .env file")
+    raise ValueError(
+        "GROQ_API_KEY not found in .env file"
+    )
 
-client = Groq(api_key=groq_api_key)
+client = Groq(
+    api_key=groq_api_key
+)
 
 
 # ============================================================
@@ -33,6 +39,7 @@ app = FastAPI(
     title="AI Appointment Assistant",
     version="Stage 7"
 )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -44,6 +51,58 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+
+# ============================================================
+# APP / SERVER ACTIVITY
+# ============================================================
+
+INACTIVITY_LIMIT_SECONDS = 5 * 60
+
+# This is intentionally GLOBAL.
+#
+# It does NOT belong to a chat session.
+#
+# It represents the last time the application backend
+# processed a real chat request.
+last_server_activity = None
+
+
+def check_server_inactivity():
+    """
+    Determine whether the backend has been inactive
+    for at least five minutes.
+
+    The timer belongs to the server/application,
+    not to an individual appointment session.
+    """
+
+    global last_server_activity
+
+    now = time.monotonic()
+
+    # First request after server startup.
+    #
+    # Do not automatically show the wake-up message.
+    # The frontend will display normal Thinking...
+    if last_server_activity is None:
+        last_server_activity = now
+        return False
+
+    inactive_for = (
+        now - last_server_activity
+    )
+
+    should_wake = (
+        inactive_for >=
+        INACTIVITY_LIMIT_SECONDS
+    )
+
+    # This request is now activity.
+    last_server_activity = now
+
+    return should_wake
+
 
 # ============================================================
 # SESSION STORAGE
@@ -68,6 +127,7 @@ def create_session():
 
 
 def get_session(session_id):
+
     if session_id not in sessions:
         sessions[session_id] = create_session()
 
@@ -103,8 +163,13 @@ def normalize_doctor(doctor):
 
     parts = doctor.split()
 
-    if len(parts) >= 2 and parts[0].lower() == "dr":
-        doctor_name = " ".join(parts[1:])
+    if (
+        len(parts) >= 2
+        and parts[0].lower() == "dr"
+    ):
+        doctor_name = " ".join(
+            parts[1:]
+        )
     else:
         doctor_name = doctor
 
@@ -123,13 +188,20 @@ def normalize_date(date_text):
     date_text = date_text.strip()
 
     try:
-        parsed_date = date.fromisoformat(date_text)
+
+        parsed_date = date.fromisoformat(
+            date_text
+        )
+
         return parsed_date.isoformat()
 
     except ValueError:
         pass
 
-    cleaned = date_text.replace(",", "")
+    cleaned = date_text.replace(
+        ",",
+        ""
+    )
 
     formats = [
         "%d %B %Y",
@@ -168,13 +240,22 @@ def normalize_time(time_text):
 
     time_text = time_text.strip().lower()
 
-    if time_text in ["morning", "in the morning"]:
+    if time_text in [
+        "morning",
+        "in the morning"
+    ]:
         return "Morning"
 
-    if time_text in ["afternoon", "in the afternoon"]:
+    if time_text in [
+        "afternoon",
+        "in the afternoon"
+    ]:
         return "Afternoon"
 
-    if time_text in ["evening", "in the evening"]:
+    if time_text in [
+        "evening",
+        "in the evening"
+    ]:
         return "Evening"
 
     formats = [
@@ -194,7 +275,9 @@ def normalize_time(time_text):
                 fmt
             )
 
-            return parsed_time.strftime("%H:%M")
+            return parsed_time.strftime(
+                "%H:%M"
+            )
 
         except ValueError:
             continue
@@ -208,7 +291,11 @@ def normalize_time(time_text):
 
 def valid_clinic_time(time_text):
 
-    if time_text in ["Morning", "Afternoon", "Evening"]:
+    if time_text in [
+        "Morning",
+        "Afternoon",
+        "Evening"
+    ]:
         return True
 
     try:
@@ -218,10 +305,21 @@ def valid_clinic_time(time_text):
             "%H:%M"
         ).time()
 
-        opening_time = dt_time(8, 0)
-        closing_time = dt_time(20, 0)
+        opening_time = dt_time(
+            8,
+            0
+        )
 
-        return opening_time <= parsed_time <= closing_time
+        closing_time = dt_time(
+            20,
+            0
+        )
+
+        return (
+            opening_time
+            <= parsed_time
+            <= closing_time
+        )
 
     except ValueError:
 
@@ -269,28 +367,35 @@ def get_doctor_id(doctor_name):
 
 def check_doctor(doctor_name):
 
-    normalized_doctor = normalize_doctor(doctor_name)
+    normalized_doctor = normalize_doctor(
+        doctor_name
+    )
 
     if not normalized_doctor:
+
         return {
             "success": False,
             "message": "Doctor name is required."
         }
 
-    doctor_id = get_doctor_id(normalized_doctor)
+    doctor_id = get_doctor_id(
+        normalized_doctor
+    )
 
     if doctor_id:
 
         return {
             "success": True,
             "doctor": normalized_doctor,
-            "message": f"{normalized_doctor} is available in the clinic."
+            "message":
+                f"{normalized_doctor} is available in the clinic."
         }
 
     return {
         "success": False,
         "doctor": normalized_doctor,
-        "message": f"{normalized_doctor} was not found in the clinic."
+        "message":
+            f"{normalized_doctor} was not found in the clinic."
     }
 
 
@@ -312,15 +417,24 @@ def update_appointment(
 
     if patient_name:
 
-        appointment["patient_name"] = patient_name.strip()
+        appointment["patient_name"] = (
+            patient_name.strip()
+        )
+
         changed = True
 
     if doctor:
 
-        normalized_doctor = normalize_doctor(doctor)
+        normalized_doctor = normalize_doctor(
+            doctor
+        )
 
         if normalized_doctor:
-            appointment["doctor"] = normalized_doctor
+
+            appointment["doctor"] = (
+                normalized_doctor
+            )
+
             changed = True
 
     if appointment_date:
@@ -339,17 +453,22 @@ def update_appointment(
 
                 return {
                     "success": False,
-                    "message": "The appointment date cannot be in the past."
+                    "message":
+                        "The appointment date cannot be in the past."
                 }
 
-            appointment["date"] = normalized_date
+            appointment["date"] = (
+                normalized_date
+            )
+
             changed = True
 
         else:
 
             return {
                 "success": False,
-                "message": "The date format could not be understood."
+                "message":
+                    "The date format could not be understood."
             }
 
     if appointment_time:
@@ -362,21 +481,26 @@ def update_appointment(
 
             return {
                 "success": False,
-                "message": "The appointment time could not be understood."
+                "message":
+                    "The appointment time could not be understood."
             }
 
-        if not valid_clinic_time(normalized_time):
+        if not valid_clinic_time(
+            normalized_time
+        ):
 
             return {
                 "success": False,
-                "message": "The appointment time must be between 8:00 AM and 8:00 PM."
+                "message":
+                    "The appointment time must be between 8:00 AM and 8:00 PM."
             }
 
-        appointment["time"] = normalized_time
+        appointment["time"] = (
+            normalized_time
+        )
+
         changed = True
 
-    # If an important appointment detail changes,
-    # previous availability confirmation is no longer valid.
     if changed:
 
         session["availability_checked"] = False
@@ -385,7 +509,8 @@ def update_appointment(
     return {
         "success": True,
         "appointment": appointment,
-        "message": "Appointment information updated successfully."
+        "message":
+            "Appointment information updated successfully."
     }
 
 
@@ -406,30 +531,36 @@ def check_availability(session):
 
         return {
             "success": False,
-            "message": "Doctor information is missing."
+            "message":
+                "Doctor information is missing."
         }
 
     if not appointment_date:
 
         return {
             "success": False,
-            "message": "Appointment date is missing."
+            "message":
+                "Appointment date is missing."
         }
 
     if not appointment_time:
 
         return {
             "success": False,
-            "message": "Appointment time is missing."
+            "message":
+                "Appointment time is missing."
         }
 
-    doctor_id = get_doctor_id(doctor)
+    doctor_id = get_doctor_id(
+        doctor
+    )
 
     if not doctor_id:
 
         return {
             "success": False,
-            "message": f"{doctor} was not found in the clinic."
+            "message":
+                f"{doctor} was not found in the clinic."
         }
 
     connection = get_db_connection()
@@ -467,11 +598,10 @@ def check_availability(session):
                 "success": True,
                 "available": False,
                 "appointment": appointment,
-                "message": (
+                "message":
                     f"{doctor} is not available on "
                     f"{appointment_date} at "
                     f"{appointment_time}."
-                )
             }
 
         session["availability_checked"] = True
@@ -481,11 +611,10 @@ def check_availability(session):
             "success": True,
             "available": True,
             "appointment": appointment,
-            "message": (
+            "message":
                 f"{doctor} has an open slot on "
                 f"{appointment_date} at "
                 f"{appointment_time}."
-            )
         }
 
     finally:
@@ -506,58 +635,64 @@ def book_appointment(session):
     appointment_date = appointment["date"]
     appointment_time = appointment["time"]
 
-    # The assistant must not book without all information.
     if not patient_name:
+
         return {
             "success": False,
-            "message": "Patient name is missing."
+            "message":
+                "Patient name is missing."
         }
 
     if not doctor:
+
         return {
             "success": False,
-            "message": "Doctor is missing."
+            "message":
+                "Doctor is missing."
         }
 
     if not appointment_date:
+
         return {
             "success": False,
-            "message": "Appointment date is missing."
+            "message":
+                "Appointment date is missing."
         }
 
     if not appointment_time:
+
         return {
             "success": False,
-            "message": "Appointment time is missing."
+            "message":
+                "Appointment time is missing."
         }
 
-    # Booking is only allowed after availability was checked
-    # and the user has reached the confirmation step.
     if not session["availability_checked"]:
 
         return {
             "success": False,
-            "message": (
+            "message":
                 "Availability must be checked before booking."
-            )
         }
 
     if not session["awaiting_confirmation"]:
 
         return {
             "success": False,
-            "message": (
+            "message":
                 "The appointment is not waiting for confirmation."
-            )
         }
 
-    doctor_id = get_doctor_id(doctor)
+    doctor_id = get_doctor_id(
+        doctor
+    )
 
     if not doctor_id:
 
         return {
             "success": False,
-            "message": "Doctor not found."
+            "message":
+                "Doctor not found."
         }
 
     connection = get_db_connection()
@@ -566,9 +701,6 @@ def book_appointment(session):
 
         cursor = connection.cursor()
 
-        # Check again immediately before insertion.
-        # This protects against another appointment being
-        # booked between availability checking and confirmation.
         cursor.execute(
             """
             SELECT id
@@ -598,7 +730,8 @@ def book_appointment(session):
 
             return {
                 "success": False,
-                "message": "This appointment slot has just been booked by someone else."
+                "message":
+                    "This appointment slot has just been booked by someone else."
             }
 
         cursor.execute(
@@ -632,12 +765,11 @@ def book_appointment(session):
         return {
             "success": True,
             "appointment": appointment,
-            "message": (
+            "message":
                 f"Appointment booked successfully for "
                 f"{patient_name} with {doctor} on "
                 f"{appointment_date} at "
                 f"{appointment_time}."
-            )
         }
 
     except errors.UniqueViolation:
@@ -649,7 +781,8 @@ def book_appointment(session):
 
         return {
             "success": False,
-            "message": "This appointment slot is already booked."
+            "message":
+                "This appointment slot is already booked."
         }
 
     finally:
@@ -676,7 +809,8 @@ def reset_appointment(session):
 
     return {
         "success": True,
-        "message": "The current appointment information has been reset."
+        "message":
+            "The current appointment information has been reset."
     }
 
 
@@ -700,22 +834,26 @@ tools = [
 
                     "patient_name": {
                         "type": "string",
-                        "description": "Patient name if explicitly provided."
+                        "description":
+                            "Patient name if explicitly provided."
                     },
 
                     "doctor": {
                         "type": "string",
-                        "description": "Doctor name if explicitly provided."
+                        "description":
+                            "Doctor name if explicitly provided."
                     },
 
                     "appointment_date": {
                         "type": "string",
-                        "description": "Appointment date if explicitly provided."
+                        "description":
+                            "Appointment date if explicitly provided."
                     },
 
                     "appointment_time": {
                         "type": "string",
-                        "description": "Appointment time if explicitly provided."
+                        "description":
+                            "Appointment time if explicitly provided."
                     }
 
                 },
@@ -738,11 +876,14 @@ tools = [
 
                     "doctor_name": {
                         "type": "string",
-                        "description": "Doctor name to check."
+                        "description":
+                            "Doctor name to check."
                     }
 
                 },
-                "required": ["doctor_name"]
+                "required": [
+                    "doctor_name"
+                ]
             }
         }
     },
@@ -864,8 +1005,10 @@ def serialize_assistant_message(message):
                     "id": tool_call.id,
                     "type": "function",
                     "function": {
-                        "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments
+                        "name":
+                            tool_call.function.name,
+                        "arguments":
+                            tool_call.function.arguments
                     }
                 }
             )
@@ -887,10 +1030,14 @@ def execute_tool(
 
         return update_appointment(
             session=session,
-            patient_name=arguments.get("patient_name"),
-            doctor=arguments.get("doctor"),
-            appointment_date=arguments.get("appointment_date"),
-            appointment_time=arguments.get("appointment_time")
+            patient_name=
+                arguments.get("patient_name"),
+            doctor=
+                arguments.get("doctor"),
+            appointment_date=
+                arguments.get("appointment_date"),
+            appointment_time=
+                arguments.get("appointment_time")
         )
 
     if tool_name == "check_doctor":
@@ -940,6 +1087,16 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 def chat(request: ChatRequest):
 
+    # --------------------------------------------------------
+    # CHECK GLOBAL SERVER INACTIVITY
+    # --------------------------------------------------------
+
+    wake_up = check_server_inactivity()
+
+    # --------------------------------------------------------
+    # GET CURRENT SESSION
+    # --------------------------------------------------------
+
     session = get_session(
         request.session_id
     )
@@ -967,12 +1124,10 @@ def chat(request: ChatRequest):
         state_message
     ]
 
-    # Add previous conversation history.
     messages.extend(
         session["messages"]
     )
 
-    # Add current user message.
     messages.append(
         {
             "role": "user",
@@ -993,7 +1148,9 @@ def chat(request: ChatRequest):
         max_tokens=700
     )
 
-    assistant_message = response.choices[0].message
+    assistant_message = (
+        response.choices[0].message
+    )
 
     # --------------------------------------------------------
     # TOOL-CALL LOOP
@@ -1001,17 +1158,23 @@ def chat(request: ChatRequest):
 
     while assistant_message.tool_calls:
 
-        serialized_message = serialize_assistant_message(
-            assistant_message
+        serialized_message = (
+            serialize_assistant_message(
+                assistant_message
+            )
         )
 
         messages.append(
             serialized_message
         )
 
-        for tool_call in assistant_message.tool_calls:
+        for tool_call in (
+            assistant_message.tool_calls
+        ):
 
-            tool_name = tool_call.function.name
+            tool_name = (
+                tool_call.function.name
+            )
 
             try:
 
@@ -1032,14 +1195,13 @@ def chat(request: ChatRequest):
             messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": json.dumps(
-                        tool_result
-                    )
+                    "tool_call_id":
+                        tool_call.id,
+                    "content":
+                        json.dumps(tool_result)
                 }
             )
 
-        # Ask Groq what to say after the tool result.
         response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=messages,
@@ -1049,13 +1211,17 @@ def chat(request: ChatRequest):
             max_tokens=700
         )
 
-        assistant_message = response.choices[0].message
+        assistant_message = (
+            response.choices[0].message
+        )
 
     # --------------------------------------------------------
-    # FINAL ASSISTANT RESPONSE
+    # FINAL RESPONSE
     # --------------------------------------------------------
 
-    final_message = assistant_message.content or ""
+    final_message = (
+        assistant_message.content or ""
+    )
 
     messages.append(
         serialize_assistant_message(
@@ -1065,10 +1231,6 @@ def chat(request: ChatRequest):
 
     # --------------------------------------------------------
     # SAVE CONVERSATION HISTORY
-    #
-    # We only save messages after the initial system messages.
-    # This preserves user messages, assistant tool calls,
-    # tool results and final assistant responses.
     # --------------------------------------------------------
 
     conversation_messages = []
@@ -1076,23 +1238,43 @@ def chat(request: ChatRequest):
     for message in messages:
 
         if message["role"] != "system":
+
             conversation_messages.append(
                 message
             )
 
-    session["messages"] = conversation_messages
+    session["messages"] = (
+        conversation_messages
+    )
 
     # --------------------------------------------------------
-    # RETURN CURRENT PYTHON STATE
+    # RETURN CURRENT STATE
     # --------------------------------------------------------
 
     return {
-        "session_id": request.session_id,
-        "response": final_message,
-        "appointment": session["appointment"],
-        "availability_checked": session["availability_checked"],
-        "awaiting_confirmation": session["awaiting_confirmation"],
-        "booking_completed": session["booking_completed"]
+        "session_id":
+            request.session_id,
+
+        "response":
+            final_message,
+
+        "appointment":
+            session["appointment"],
+
+        "availability_checked":
+            session["availability_checked"],
+
+        "awaiting_confirmation":
+            session["awaiting_confirmation"],
+
+        "booking_completed":
+            session["booking_completed"],
+
+        # Important:
+        # This is GLOBAL server activity,
+        # not session activity.
+        "wake_up":
+            wake_up
     }
 
 
@@ -1108,11 +1290,20 @@ def get_appointment(session_id: str):
     )
 
     return {
-        "session_id": session_id,
-        "appointment": session["appointment"],
-        "availability_checked": session["availability_checked"],
-        "awaiting_confirmation": session["awaiting_confirmation"],
-        "booking_completed": session["booking_completed"]
+        "session_id":
+            session_id,
+
+        "appointment":
+            session["appointment"],
+
+        "availability_checked":
+            session["availability_checked"],
+
+        "awaiting_confirmation":
+            session["awaiting_confirmation"],
+
+        "booking_completed":
+            session["booking_completed"]
     }
 
 
@@ -1127,7 +1318,8 @@ def delete_appointment(session_id: str):
 
     return {
         "success": True,
-        "message": "Session appointment information has been reset."
+        "message":
+            "Session appointment information has been reset."
     }
 
 
@@ -1152,6 +1344,8 @@ def health():
 def root():
 
     return {
-        "message": "AI Appointment Assistant - Stage 7",
-        "status": "running"
+        "message":
+            "AI Appointment Assistant - Stage 7",
+        "status":
+            "running"
     }
