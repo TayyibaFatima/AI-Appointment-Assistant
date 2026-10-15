@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import json
+import re
 from datetime import date, datetime, time as dt_time
 
 import psycopg2
@@ -66,6 +67,8 @@ def create_session():
         "availability_checked": False,
         "awaiting_confirmation": False,
         "booking_completed": False,
+        "awaiting_doctor_list_choice": False,
+        "doctor_list_shown": False,
         "messages": []
     }
 
@@ -297,6 +300,59 @@ def check_doctor(doctor_name):
         "doctor": normalized_doctor,
         "message": f"{normalized_doctor} was not found in the clinic."
     }
+
+
+# ============================================================
+# LIST DOCTORS
+# ============================================================
+
+def get_doctors_list():
+    """Read doctors from the database and show known specialties."""
+    connection = get_db_connection()
+
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT name FROM doctors ORDER BY name")
+        rows = cursor.fetchall()
+        cursor.close()
+
+        if not rows:
+            return {
+                "success": True,
+                "doctors": [],
+                "message": "There are currently no doctors listed in the clinic database."
+            }
+
+        # These specialties match the doctors configured for this project.
+        specialties = {
+            "dr. sara": "General Physician",
+            "dr sara": "General Physician",
+            "dr. ahmed": "Cardiologist",
+            "dr ahmed": "Cardiologist"
+        }
+
+        doctor_lines = []
+        doctors = []
+
+        for row in rows:
+            name = row[0]
+            normalized_key = name.strip().lower()
+            specialty = specialties.get(normalized_key, "Specialty not specified")
+            doctors.append({"name": name, "specialty": specialty})
+            doctor_lines.append(f"- {name} — {specialty}")
+
+        message = (
+            "Here is our doctors list:\n"
+            + "\n".join(doctor_lines)
+            + "\n\nGeneral clinic timings: 8:00 AM to 8:00 PM. "
+              "Doctor-specific working hours are not configured in the current database. "
+              "Tell me which doctor, date, and time you would like, and I will check that slot."
+        )
+
+        return {"success": True, "doctors": doctors, "message": message}
+
+    finally:
+        connection.close()
 
 
 # ============================================================
@@ -681,6 +737,8 @@ def reset_appointment(session):
     session["availability_checked"] = False
     session["awaiting_confirmation"] = False
     session["booking_completed"] = False
+    session["awaiting_doctor_list_choice"] = False
+    session["doctor_list_shown"] = False
 
     return {
         "success": True,
@@ -693,6 +751,23 @@ def reset_appointment(session):
 # ============================================================
 
 tools = [
+
+    {
+        "type": "function",
+        "function": {
+            "name": "list_doctors",
+            "description": (
+                "Show the doctors currently listed in the clinic database, "
+                "their known specialties, and general clinic timings when "
+                "the user asks to see the doctors list."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
 
     {
         "type": "function",
@@ -828,19 +903,28 @@ their name, and book appointments.
 
 IMPORTANT BOOKING FLOW:
 
-1. Ask for doctor, date and time.
+1. When a user starts by saying they want to book an appointment and has not
+   supplied a doctor/date/time, first ask:
+   "Sure! Would you like to see our doctors list with their general timings?"
 
-2. Save the information using update_appointment.
+2. If the user says yes, asks to see the list, or agrees to view doctors,
+   call list_doctors and show the database-backed doctor list. Do not invent
+   doctor-specific schedules. The current general clinic hours are 8:00 AM to 8:00 PM.
 
-3. Verify the doctor using check_doctor.
+3. After showing the list, ask which doctor, date, and time the user wants.
+   The user may also provide these details without viewing the list.
 
-4. Check availability using check_availability.
+4. Save the information using update_appointment.
 
-5. If the requested slot is unavailable, clearly tell the user
+5. Verify the doctor using check_doctor.
+
+6. Check availability using check_availability.
+
+7. If the requested slot is unavailable, clearly tell the user
    that the doctor is not available at that time and ask whether
    they would like another time or doctor.
 
-6. If the requested slot is available, respond naturally.
+8. If the requested slot is available, respond naturally.
 
 For example:
 
@@ -849,13 +933,13 @@ What name should I put the appointment under?"
 
 Do NOT say "Great!" every time a slot is available.
 
-7. After the user gives their name, ask for explicit confirmation.
+9. After the user gives their name, ask for explicit confirmation.
 
 For example:
 
 "Thanks, Tayyiba. Would you like me to book this appointment?"
 
-8. A patient's name is NEVER booking confirmation.
+10. A patient's name is NEVER booking confirmation.
 
 For example:
 
@@ -863,7 +947,7 @@ For example:
 
 is a name/message containing a name, NOT confirmation.
 
-9. Only book after a separate explicit confirmation such as:
+11. Only book after a separate explicit confirmation such as:
 
 "yes"
 "yes please"
@@ -875,11 +959,11 @@ is a name/message containing a name, NOT confirmation.
 "go ahead"
 "book the appointment"
 
-10. Never promise SMS, email, notifications, reminders,
+12. Never promise SMS, email, notifications, reminders,
 or a confirmation being sent because this system does not
 have a notification service.
 
-11. After successful booking, give a short plain-text
+13. After successful booking, give a short plain-text
 confirmation with the appointment details.
 
 Use this style:
@@ -894,18 +978,18 @@ Time: 09:00
 Do NOT use Markdown bold formatting.
 Do NOT put ** around the fields.
 
-12. If the user changes the doctor, date or time,
+14. If the user changes the doctor, date or time,
 availability must be checked again.
 
-13. If the user only provides their name, availability
+15. If the user only provides their name, availability
 must NOT be reset.
 
-14. Never invent patient information, doctor information,
+16. Never invent patient information, doctor information,
 dates, times, or availability.
 
-15. The Python appointment state is authoritative.
+17. The Python appointment state is authoritative.
 
-16. Respond naturally and concisely.
+18. Respond naturally and concisely.
 """
 
 
@@ -949,6 +1033,9 @@ def execute_tool(
     tool_name,
     arguments
 ):
+
+    if tool_name == "list_doctors":
+        return get_doctors_list()
 
     if tool_name == "update_appointment":
 
@@ -1069,6 +1156,93 @@ def chat(request: ChatRequest):
     appointment = session["appointment"]
 
     user_message = request.message.strip()
+    normalized_user_message = " ".join(user_message.lower().split())
+
+    # --------------------------------------------------------
+    # DOCTOR-LIST-FIRST BOOKING FLOW
+    # --------------------------------------------------------
+
+    yes_responses = {
+        "yes", "yes please", "sure", "okay", "ok", "yep",
+        "show me", "show the list", "please show me", "of course"
+    }
+    no_responses = {
+        "no", "no thanks", "no thank you", "not now", "skip"
+    }
+
+    if session.get("awaiting_doctor_list_choice"):
+        if normalized_user_message in yes_responses or any(
+            phrase in normalized_user_message
+            for phrase in ("show me the doctors", "show the doctors", "doctors list", "doctor list")
+        ):
+            result = get_doctors_list()
+            session["awaiting_doctor_list_choice"] = False
+            session["doctor_list_shown"] = True
+            final_message = result["message"]
+
+            session["messages"].append({"role": "user", "content": request.message})
+            session["messages"].append({"role": "assistant", "content": final_message})
+
+            return {
+                "session_id": request.session_id,
+                "response": final_message,
+                "appointment": session["appointment"],
+                "availability_checked": session["availability_checked"],
+                "awaiting_confirmation": session["awaiting_confirmation"],
+                "booking_completed": session["booking_completed"]
+            }
+
+        if normalized_user_message in no_responses:
+            session["awaiting_doctor_list_choice"] = False
+            final_message = "No problem. Tell me which doctor, date, and time you would like, and I'll check the slot."
+
+            session["messages"].append({"role": "user", "content": request.message})
+            session["messages"].append({"role": "assistant", "content": final_message})
+
+            return {
+                "session_id": request.session_id,
+                "response": final_message,
+                "appointment": session["appointment"],
+                "availability_checked": session["availability_checked"],
+                "awaiting_confirmation": session["awaiting_confirmation"],
+                "booking_completed": session["booking_completed"]
+            }
+
+    booking_intent = bool(re.search(
+        r"\\b(book|schedule|make|want|need)\\b", normalized_user_message
+    )) and any(
+        phrase in normalized_user_message
+        for phrase in ("appointment", "doctor", "see a doctor", "visit")
+    )
+
+    appointment = session["appointment"]
+    has_booking_details = bool(
+        appointment["doctor"] or appointment["date"] or appointment["time"]
+    )
+    has_doctor_details_in_message = bool(
+        re.search(r"\\bdr\\.?\\s+[a-z]+\\b", normalized_user_message)
+    )
+
+    if (
+        booking_intent
+        and not has_booking_details
+        and not has_doctor_details_in_message
+        and not session.get("doctor_list_shown")
+    ):
+        session["awaiting_doctor_list_choice"] = True
+        final_message = "Sure! Would you like to see our doctors list with their general timings?"
+
+        session["messages"].append({"role": "user", "content": request.message})
+        session["messages"].append({"role": "assistant", "content": final_message})
+
+        return {
+            "session_id": request.session_id,
+            "response": final_message,
+            "appointment": session["appointment"],
+            "availability_checked": session["availability_checked"],
+            "awaiting_confirmation": session["awaiting_confirmation"],
+            "booking_completed": session["booking_completed"]
+        }
 
     # --------------------------------------------------------
     # DIRECT CONFIRMATION HANDLING
