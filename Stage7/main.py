@@ -590,19 +590,19 @@ def check_availability(session):
 
             # Check whether this doctor works on the requested day and time.
             cur.execute("""
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM public.doctor_schedules
-                    WHERE doctor_id = %s
-                      AND day_of_week = %s
-                      AND start_time <= %s
-                      AND end_time > %s
-                )
+            SELECT EXISTS (
+            SELECT 1
+            FROM public.appointments
+            WHERE doctor_id = %s
+            AND appointment_date = %s
+            AND appointment_time::text IN (%s, %s)
+            AND status = 'booked'
+            )
             """, (
-                doctor_id,
-                weekday,
-                appointment_time,
-                appointment_time
+            doctor_id,
+            appointment_date,
+            appointment_time.strftime("%H:%M:%S"),
+            appointment_time.strftime("%H:%M")
             ))
 
             is_within_schedule = cur.fetchone()[0]
@@ -747,20 +747,21 @@ def book_appointment(session):
 
         # Recheck immediately before booking.
         cursor.execute(
-            """
-            SELECT id
-            FROM appointments
-            WHERE doctor_id = %s
-            AND appointment_date = %s
-            AND appointment_time = %s
-            AND status = 'booked'
-            """,
-            (
-                doctor_id,
-                appointment_date,
-                appointment_time
-            )
-        )
+        """
+        SELECT id
+        FROM appointments
+        WHERE doctor_id = %s
+        AND appointment_date = %s
+        AND appointment_time::text IN (%s, %s)
+        AND status = 'booked'
+       """,
+       (
+        doctor_id,
+        appointment_date,
+        appointment_time,
+        appointment_time[:5]
+      )
+      )
 
         existing = cursor.fetchone()
 
