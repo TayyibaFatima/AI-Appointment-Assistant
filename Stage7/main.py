@@ -306,8 +306,13 @@ def check_doctor(doctor_name):
 # LIST DOCTORS
 # ============================================================
 
-def get_doctors_list():
-    """Read doctors from the database and show known specialties."""
+def get_doctors_list(specialty=None):
+    """Return database-listed doctors, optionally filtered by specialty.
+
+    This project currently stores doctor names in the database and maps the
+    two configured doctors to their known specialties here. If the database
+    later gains a specialty column, read it from that column instead.
+    """
     connection = get_db_connection()
 
     try:
@@ -316,14 +321,7 @@ def get_doctors_list():
         rows = cursor.fetchall()
         cursor.close()
 
-        if not rows:
-            return {
-                "success": True,
-                "doctors": [],
-                "message": "There are currently no doctors listed in the clinic database."
-            }
-
-        # These specialties match the doctors configured for this project.
+        # Keep this mapping synchronized with the doctors configured for the demo.
         specialties = {
             "dr. sara": "General Physician",
             "dr sara": "General Physician",
@@ -331,25 +329,69 @@ def get_doctors_list():
             "dr ahmed": "Cardiologist"
         }
 
-        doctor_lines = []
         doctors = []
+        requested_specialty = (specialty or "").strip().lower()
 
         for row in rows:
             name = row[0]
-            normalized_key = name.strip().lower()
-            specialty = specialties.get(normalized_key, "Specialty not specified")
-            doctors.append({"name": name, "specialty": specialty})
-            doctor_lines.append(f"- {name} — {specialty}")
+            specialty_name = specialties.get(name.strip().lower(), "Specialty not specified")
+            doctor = {"name": name, "specialty": specialty_name}
+
+            if requested_specialty:
+                # Allow natural variants such as "heart doctor" and "dermatology".
+                specialty_aliases = {
+                    "general physician": {"general physician", "general doctor", "physician", "gp"},
+                    "cardiologist": {"cardiologist", "cardiology", "heart doctor", "heart specialist"},
+                    "dermatologist": {"dermatologist", "dermatology", "skin doctor", "skin specialist"}
+                }
+                accepted_terms = specialty_aliases.get(requested_specialty, {requested_specialty})
+                normalized_doctor_specialty = specialty_name.lower()
+                matches = (
+                    requested_specialty in normalized_doctor_specialty
+                    or normalized_doctor_specialty in accepted_terms
+                    or any(term in normalized_doctor_specialty for term in accepted_terms)
+                )
+                if not matches:
+                    continue
+
+            doctors.append(doctor)
+
+        if not doctors:
+            if requested_specialty:
+                return {
+                    "success": True,
+                    "doctors": [],
+                    "specialty": specialty,
+                    "message": (
+                        f"I couldn't find any doctors listed under {specialty} in the current clinic database. "
+                        "You can ask to see all available doctors or choose another specialty."
+                    )
+                }
+            return {
+                "success": True,
+                "doctors": [],
+                "message": "There are currently no doctors listed in the clinic database."
+            }
+
+        doctor_lines = [f"- {doctor['name']} — {doctor['specialty']}" for doctor in doctors]
+        if requested_specialty:
+            heading = f"Here are the doctors listed for {specialty}:"
+        else:
+            heading = "Here is our doctors list:"
 
         message = (
-            "Here is our doctors list:\n"
-            + "\n".join(doctor_lines)
+            heading + "\n" + "\n".join(doctor_lines)
             + "\n\nGeneral clinic timings: 8:00 AM to 8:00 PM. "
               "Doctor-specific working hours are not configured in the current database. "
-              "Tell me which doctor, date, and time you would like, and I will check that slot."
+              "Please choose a doctor, then tell me your preferred date and time."
         )
 
-        return {"success": True, "doctors": doctors, "message": message}
+        return {
+            "success": True,
+            "specialty": specialty,
+            "doctors": doctors,
+            "message": message
+        }
 
     finally:
         connection.close()
@@ -757,13 +799,18 @@ tools = [
         "function": {
             "name": "list_doctors",
             "description": (
-                "Show the doctors currently listed in the clinic database, "
-                "their known specialties, and general clinic timings when "
-                "the user asks to see the doctors list."
+                "List doctors from the clinic database. If the user requests a specialty "
+                "such as cardiology or dermatology, pass that specialty to return only "
+                "matching doctors. If no specialty is requested, list all doctors."
             ),
             "parameters": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "specialty": {
+                        "type": "string",
+                        "description": "Requested specialty, if the user mentioned one; otherwise omit it."
+                    }
+                },
                 "required": []
             }
         }
@@ -895,101 +942,51 @@ tools = [
 # ============================================================
 
 SYSTEM_INSTRUCTION = """
-You are an AI clinic appointment assistant.
+You are an AI clinic appointment assistant. Keep the conversation natural,
+helpful, and concise. The Python appointment state and clinic database are
+authoritative; never invent doctors, specialties, dates, times, or availability.
 
-Your job is to have a natural, concise conversation while
-helping users check doctors, find available slots, collect
-their name, and book appointments.
+APPOINTMENT CONVERSATION FLOW:
 
-IMPORTANT BOOKING FLOW:
+1. If the user says they want an appointment but has not named a doctor or
+   specialty, ask whether they want to see the doctors list or have a specialty
+   in mind. Do not force them to view the full list.
 
-1. When a user starts by saying they want to book an appointment and has not
-   supplied a doctor/date/time, first ask:
-   "Sure! Would you like to see our doctors list with their general timings?"
+2. If the user names a specialty (for example, dermatologist, cardiologist, or
+   general physician), call list_doctors with that specialty. Show only the
+   matching doctors returned by the tool. If no matching doctors are returned,
+   explain that the current clinic database has no doctors listed for that
+   specialty and offer to show all doctors or try another specialty.
 
-2. If the user says yes, asks to see the list, or agrees to view doctors,
-   call list_doctors and show the database-backed doctor list. Do not invent
-   doctor-specific schedules. The current general clinic hours are 8:00 AM to 8:00 PM.
+3. If the user asks to see all doctors, agrees to view the list, or asks who is
+   available, call list_doctors without a specialty. Show the names and known
+   specialties returned by the tool. Never invent doctor schedules. General
+   clinic hours are 8:00 AM to 8:00 PM; doctor-specific working hours are not
+   configured in this demo.
 
-3. After showing the list, ask which doctor, date, and time the user wants.
-   The user may also provide these details without viewing the list.
+4. After listing doctors for a specialty, ask the user to choose one. Do not
+   choose a doctor for the user. Once they select a doctor, ask for any missing
+   preferred date and time. The user may also provide the doctor, date, and time
+   together in one message.
 
-4. Save the information using update_appointment.
+5. Use update_appointment to save details explicitly provided by the user.
+   Verify the chosen doctor with check_doctor, then check_availability only when
+   doctor, date, and time are all present. If the slot is unavailable, say so
+   and ask whether they would prefer another time or doctor. If the user changes
+   doctor, date, or time, check availability again.
 
-5. Verify the doctor using check_doctor.
+6. If the slot is available, ask for the patient's name if missing. After the
+   name is provided, ask for a separate explicit booking confirmation. A name
+   is never confirmation. Do not book until the user separately says something
+   explicit such as "yes", "yes please", "book it", "confirm", or "go ahead".
 
-6. Check availability using check_availability.
+7. Use book_appointment only after availability was successfully checked, the
+   user explicitly confirmed in a separate turn, and all required details exist.
+   After successful booking, provide a plain-text confirmation with patient,
+   doctor, date, and time. Do not promise SMS, email, reminders, or notifications.
 
-7. If the requested slot is unavailable, clearly tell the user
-   that the doctor is not available at that time and ask whether
-   they would like another time or doctor.
-
-8. If the requested slot is available, respond naturally.
-
-For example:
-
-"Yes, Dr. Sara is available on 2026-10-15 at 09:00.
-What name should I put the appointment under?"
-
-Do NOT say "Great!" every time a slot is available.
-
-9. After the user gives their name, ask for explicit confirmation.
-
-For example:
-
-"Thanks, Tayyiba. Would you like me to book this appointment?"
-
-10. A patient's name is NEVER booking confirmation.
-
-For example:
-
-"yes I'm Tayyiba"
-
-is a name/message containing a name, NOT confirmation.
-
-11. Only book after a separate explicit confirmation such as:
-
-"yes"
-"yes please"
-"yes, book it"
-"book it"
-"confirm"
-"confirmed"
-"please book it"
-"go ahead"
-"book the appointment"
-
-12. Never promise SMS, email, notifications, reminders,
-or a confirmation being sent because this system does not
-have a notification service.
-
-13. After successful booking, give a short plain-text
-confirmation with the appointment details.
-
-Use this style:
-
-Your appointment has been booked successfully!
-
-Patient: Tayyiba
-Doctor: Dr. Sara
-Date: 2026-10-15
-Time: 09:00
-
-Do NOT use Markdown bold formatting.
-Do NOT put ** around the fields.
-
-14. If the user changes the doctor, date or time,
-availability must be checked again.
-
-15. If the user only provides their name, availability
-must NOT be reset.
-
-16. Never invent patient information, doctor information,
-dates, times, or availability.
-
-17. The Python appointment state is authoritative.
-
-18. Respond naturally and concisely.
+8. If the user wants to start over, use reset_appointment. Never show raw tool
+   output or claim a booking succeeded unless the booking tool reports success.
 """
 
 
@@ -1035,7 +1032,9 @@ def execute_tool(
 ):
 
     if tool_name == "list_doctors":
-        return get_doctors_list()
+        return get_doctors_list(
+            specialty=arguments.get("specialty")
+        )
 
     if tool_name == "update_appointment":
 
