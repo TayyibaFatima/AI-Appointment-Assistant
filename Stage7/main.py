@@ -556,8 +556,8 @@ def check_availability(session):
             return "Please provide a valid appointment time, such as 9 AM or 2:30 PM."
 
     # Appointments must fall within the clinic's general opening hours.
-    clinic_open = time(8, 0)
-    clinic_close = time(20, 0)
+    clinic_open = dt_time(8, 0)
+    clinic_close = dt_time(20, 0)
 
     if not (clinic_open <= appointment_time < clinic_close):
         session["availability_checked"] = False
