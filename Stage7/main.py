@@ -520,42 +520,48 @@ def check_availability(session):
             "and preferred time before checking availability."
         )
 
-    # Validate and normalize the date.
+    # Validate the appointment date.
     try:
-        appointment_date = datetime.strptime(
-            date_text, "%Y-%m-%d"
-        ).date()
+        appointment_date = date.fromisoformat(date_text)
     except (ValueError, TypeError):
+        session["availability_checked"] = False
+        session["awaiting_confirmation"] = False
         return "Please provide a valid date in YYYY-MM-DD format."
 
     if appointment_date < date.today():
         session["availability_checked"] = False
         session["awaiting_confirmation"] = False
-        return "The appointment date cannot be in the past. Please choose another date."
+        return (
+            "The appointment date cannot be in the past. "
+            "Please choose another date."
+        )
 
     # Normalize the requested time.
     normalized_time = normalize_time(time_text)
 
-    if not normalized_time:
+    if not normalized_time or normalized_time in (
+        "Morning", "Afternoon", "Evening"
+    ):
         session["availability_checked"] = False
         session["awaiting_confirmation"] = False
-        return "I couldn't understand that time. Please provide a time such as 9 AM or 14:00."
+        return (
+            "I couldn't understand the exact appointment time. "
+            "Please provide a time such as 9 AM or 2:30 PM."
+        )
 
     try:
         appointment_time = datetime.strptime(
-            normalized_time, "%H:%M:%S"
+            normalized_time, "%H:%M"
         ).time()
     except (ValueError, TypeError):
-        try:
-            appointment_time = datetime.strptime(
-                normalized_time, "%H:%M"
-            ).time()
-        except (ValueError, TypeError):
-            session["availability_checked"] = False
-            session["awaiting_confirmation"] = False
-            return "Please provide a valid appointment time, such as 9 AM or 2:30 PM."
+        session["availability_checked"] = False
+        session["awaiting_confirmation"] = False
+        return (
+            "Please provide a valid appointment time, "
+            "such as 9 AM or 2:30 PM."
+        )
 
-    # Appointments must fall within the clinic's general opening hours.
+    # Check general clinic opening hours.
     clinic_open = dt_time(8, 0)
     clinic_close = dt_time(20, 0)
 
@@ -578,7 +584,7 @@ def check_availability(session):
             "Please select a doctor from the available list."
         )
 
-    # Monday = 0, Tuesday = 1, ..., Sunday = 6.
+    # Python weekday: Monday = 0, Sunday = 6.
     weekday = appointment_date.weekday()
 
     conn = None
@@ -588,51 +594,71 @@ def check_availability(session):
 
         with conn.cursor() as cur:
 
-            # Check whether this doctor works on the requested day and time.
+            # Retrieve this doctor's working hours for the requested day.
             cur.execute("""
-            SELECT EXISTS (
-            SELECT 1
-            FROM public.appointments
-            WHERE doctor_id = %s
-            AND appointment_date = %s
-            AND appointment_time::text IN (%s, %s)
-            AND status = 'booked'
-            )
-            """, (
-            doctor_id,
-            appointment_date,
-            appointment_time.strftime("%H:%M:%S"),
-            appointment_time.strftime("%H:%M")
-            ))
+                SELECT start_time, end_time
+                FROM public.doctor_schedules
+                WHERE doctor_id = %s
+                  AND day_of_week = %s
+                ORDER BY start_time
+            """, (doctor_id, weekday))
 
-            is_within_schedule = cur.fetchone()[0]
+            schedules = cur.fetchall()
+
+            print(
+                f"DEBUG availability: doctor={doctor_name}, "
+                f"doctor_id={doctor_id}, date={appointment_date}, "
+                f"weekday={weekday}, requested_time={appointment_time}, "
+                f"schedules={schedules}"
+            )
+
+            # A time is valid when it is within any configured schedule.
+            is_within_schedule = any(
+                start_time <= appointment_time < end_time
+                for start_time, end_time in schedules
+            )
 
             if not is_within_schedule:
                 session["availability_checked"] = False
                 session["awaiting_confirmation"] = False
 
+                if schedules:
+                    hours = "; ".join(
+                        f"{start.strftime('%I:%M %p').lstrip('0')}–"
+                        f"{end.strftime('%I:%M %p').lstrip('0')}"
+                        for start, end in schedules
+                    )
+
+                    return (
+                        f"{doctor_name} is not scheduled to work at "
+                        f"{appointment_time.strftime('%I:%M %p').lstrip('0')} "
+                        f"on {appointment_date.strftime('%A, %B %d, %Y')}. "
+                        f"Working hours that day: {hours}. "
+                        "Please choose a time within those hours."
+                    )
+
                 return (
-                    f"{doctor_name} is not scheduled to work at "
-                    f"{appointment_time.strftime('%I:%M %p').lstrip('0')} "
-                    f"on {appointment_date.strftime('%A')}, "
-                    f"{appointment_date.strftime('%B %d, %Y')}. "
-                    "Please choose a time within this doctor's working hours."
+                    f"{doctor_name} does not have configured working hours "
+                    f"on {appointment_date.strftime('%A')}. "
+                    "Please choose another date or doctor."
                 )
 
-            # Check whether the exact requested slot is already booked.
+            # Check whether this exact slot is already booked.
+            # appointment_time is stored as text in the current schema.
             cur.execute("""
                 SELECT EXISTS (
                     SELECT 1
                     FROM public.appointments
                     WHERE doctor_id = %s
                       AND appointment_date = %s
-                      AND appointment_time = %s
+                      AND appointment_time::text IN (%s, %s)
                       AND status = 'booked'
                 )
             """, (
                 doctor_id,
                 appointment_date,
-                appointment_time
+                appointment_time.strftime("%H:%M:%S"),
+                appointment_time.strftime("%H:%M")
             ))
 
             is_booked = cur.fetchone()[0]
@@ -648,8 +674,9 @@ def check_availability(session):
                     "Please choose another time."
                 )
 
-        # The doctor works at this time, and the exact slot is free.
+        # Schedule is valid and the exact slot is not booked.
         appointment["time"] = appointment_time.strftime("%H:%M:%S")
+
         session["availability_checked"] = True
         session["awaiting_confirmation"] = False
 
@@ -663,6 +690,7 @@ def check_availability(session):
     except Exception as e:
         session["availability_checked"] = False
         session["awaiting_confirmation"] = False
+
         print(f"Availability check error: {e}")
 
         return (
@@ -673,7 +701,6 @@ def check_availability(session):
     finally:
         if conn is not None:
             conn.close()
-
 
 # ============================================================
 # BOOK APPOINTMENT
